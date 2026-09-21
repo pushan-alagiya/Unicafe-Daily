@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Steam waves -->
+    <path
+        android:pathData="M44,30 C42,34 46,38 44,42"
+        android:strokeColor="#FFB74D"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M54,28 C52,33 56,37 54,42"
+        android:strokeColor="#FFA726"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M64,30 C62,34 66,38 64,42"
+        android:strokeColor="#FFB74D"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- Bowl rim and body -->
+    <path
+        android:pathData="M30,47 L78,47 C78,47 77,72 54,72 C31,72 30,47 30,47 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Bowl inner food warm accent -->
+    <path
+        android:pathData="M33,48 L75,48 C75,56 66,62 54,62 C42,62 33,56 33,48 Z"
+        android:fillColor="#FF8F00" />
+
+    <!-- Fork motif on the left inside or fork icon badge -->
+    <path
+        android:pathData="M48,50 L48,56 M54,50 L54,58 M60,50 L60,56"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round" />
+
+    <!-- Bowl stand / base -->
+    <path
+        android:pathData="M44,72 L64,72 L66,76 L42,76 Z"
+        android:fillColor="#ECEFF1" />
+
+    <!-- Leaf accent representing healthy/dietary food (UniCafe's focus) -->
+    <path
+        android:pathData="M65,44 C67,39 74,38 76,41 C74,45 68,46 65,44 Z"
+        android:fillColor="#4CAF50" />
+</vector>

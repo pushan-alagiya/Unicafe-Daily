@@ -1,0 +1,6 @@
+{
+  "name": "UniCafe Daily",
+  "description": "Daily lunch menus, dietary filters, and opening hours for University of Helsinki UniCafe restaurants",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

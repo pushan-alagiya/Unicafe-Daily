@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">UniCafe Daily</string>
+    <string name="widget_description">Today\'s UniCafe lunch menu &amp; opening status</string>
+    <string name="refresh">Refresh</string>
+    <string name="favorites">Favorites</string>
+    <string name="choose_favorites">Choose Favorites</string>
+    <string name="filter_all">All</string>
+    <string name="filter_veg">Veg</string>
+    <string name="filter_gluten_free">G</string>
+    <string name="filter_milk_free">M</string>
+    <string name="status_open">OPEN</string>
+    <string name="status_closed">CLOSED</string>
+    <string name="save">Save</string>
+    <string name="retry">Retry</string>
+    <string name="max_favorites_notice">You can select up to 3 favorite restaurants</string>
+</resources>
