@@ -18,7 +18,7 @@ Check today's menus, find meals matching your diet, see which of your favourite 
 
 <div align="center">
 
-<img src="docs/screenshots/home-screen.png" alt="UniCafe Daily home screen" width="320"/>
+<img src="docs/screenshots/home-screen.png" alt="UniCafe Daily home screen" />
 
 </div>
 
