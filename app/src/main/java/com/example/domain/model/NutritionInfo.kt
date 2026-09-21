@@ -28,14 +28,14 @@ data class NutritionInfo(
 
             val kcal = extract("""(\d+(?:[.,]\d+)?)\s*kcal""")?.let { "$it kcal" }
             val kj = extract("""(\d+(?:[.,]\d+)?)\s*kJ""")?.let { "$it kJ" }
-            val fat = extract("""(?:^|[\s,])rasva\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
-            val satFat = extract("""tyydyttynyttä(?:\s+rasvaa)?\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
-            val carbs = extract("""hiilihydraat(?:it)?\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
-            val sugars = extract("""sokereita\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
-            val protein = extract("""proteiini(?:a)?\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
-            val salt = extract("""suola(?:a)?\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
-            val fiber = extract("""ravintokuitu(?:a)?\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
-            val lactose = extract("""laktoosi(?:a)?\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
+            val fat = extract("""(?:rasva|fat|fett)\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
+            val satFat = extract("""(?:tyydyttynyttä|saturated|mättat)\s*(?:rasvaa|fat|fett)?\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
+            val carbs = extract("""(?:hiilihydraat(?:it)?|carbohydrate(?:s)?|carbs|kolhydrat(?:er)?)\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
+            val sugars = extract("""(?:sokereita|sokeri|sugars?|socker(?:arter)?)\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
+            val protein = extract("""(?:proteiini(?:a)?|protein)\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
+            val salt = extract("""(?:suola(?:a)?|salt)\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
+            val fiber = extract("""(?:ravintokuitu(?:a)?|kuitu|fibre|fiber|kostfiber)\s+(\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
+            val lactose = extract("""(?:laktoosi(?:a)?|lactose|laktos)\s+(<?\d+(?:[.,]\d+)?)\s*g""")?.let { "${it}g" }
 
             return NutritionInfo(
                 caloriesKcal = kcal,

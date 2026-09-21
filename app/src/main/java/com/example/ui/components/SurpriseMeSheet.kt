@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,6 +63,7 @@ import com.example.ui.theme.BrandCoral
 @Composable
 fun SurpriseMeSheet(
     favoriteRestaurants: List<Restaurant>,
+    allRestaurants: List<Restaurant>,
     onRecordEaten: (Meal, String) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
@@ -68,13 +71,18 @@ fun SurpriseMeSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var currentFilter by remember { mutableStateOf(DietaryFilter.ALL) }
+    var onlyFavorites by remember { mutableStateOf(favoriteRestaurants.isNotEmpty()) }
     var rollSeed by remember { mutableIntStateOf(0) }
     var hasEatenRecorded by remember { mutableStateOf(false) }
 
+    val poolRestaurants = remember(onlyFavorites, favoriteRestaurants, allRestaurants) {
+        if (onlyFavorites && favoriteRestaurants.isNotEmpty()) favoriteRestaurants else allRestaurants
+    }
+
     // Aggregate eligible dishes
-    val eligiblePairs = remember(favoriteRestaurants, currentFilter, rollSeed) {
+    val eligiblePairs = remember(poolRestaurants, currentFilter, rollSeed) {
         val pairs = mutableListOf<Pair<Meal, Restaurant>>()
-        for (restaurant in favoriteRestaurants) {
+        for (restaurant in poolRestaurants) {
             for (meal in restaurant.todaysMeals) {
                 val matches = when (currentFilter) {
                     DietaryFilter.ALL -> true
@@ -134,7 +142,7 @@ fun SurpriseMeSheet(
                     )
                 }
 
-                IconButton(onClick = onDismiss) {
+                IconButton(onClick = onDismiss, modifier = Modifier.testTag("close_surprise_sheet")) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
@@ -143,15 +151,80 @@ fun SurpriseMeSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Restaurant pool toggle (Favourites vs All)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Surface(
+                    onClick = {
+                        onlyFavorites = true
+                        rollSeed++
+                        hasEatenRecorded = false
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (onlyFavorites) MaterialTheme.colorScheme.surface else Color.Transparent,
+                    shadowElevation = if (onlyFavorites) 1.dp else 0.dp,
+                    modifier = Modifier.weight(1f).height(34.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = if (onlyFavorites) BrandBlue else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Favourites only",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (onlyFavorites) FontWeight.Bold else FontWeight.Medium,
+                            color = if (onlyFavorites) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Surface(
+                    onClick = {
+                        onlyFavorites = false
+                        rollSeed++
+                        hasEatenRecorded = false
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (!onlyFavorites) MaterialTheme.colorScheme.surface else Color.Transparent,
+                    shadowElevation = if (!onlyFavorites) 1.dp else 0.dp,
+                    modifier = Modifier.weight(1f).height(34.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "All UniCafes",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (!onlyFavorites) FontWeight.Bold else FontWeight.Medium,
+                            color = if (!onlyFavorites) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Dietary Filter Pills
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 listOf(
-                    DietaryFilter.ALL to "Any",
+                    DietaryFilter.ALL to "Any meal",
                     DietaryFilter.VEG to "Vegan",
                     DietaryFilter.GLUTEN_FREE to "Gluten-free",
                     DietaryFilter.MILK_FREE to "Milk-free"
@@ -163,9 +236,9 @@ fun SurpriseMeSheet(
                             rollSeed++
                             hasEatenRecorded = false
                         },
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(14.dp),
                         color = if (isSelected) BrandBlue else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.weight(1f).height(36.dp)
+                        modifier = Modifier.weight(1f).height(34.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
@@ -173,14 +246,15 @@ fun SurpriseMeSheet(
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
+                                maxLines = 1,
+                                fontSize = 11.sp
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Result Card
             if (selectedCandidate != null) {
@@ -189,7 +263,7 @@ fun SurpriseMeSheet(
                 AnimatedContent(
                     targetState = selectedCandidate,
                     transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = "dish_animation"
+                    label = "surprise_dish_animation"
                 ) { (currentMeal, currentRestaurant) ->
                     Surface(
                         shape = RoundedCornerShape(20.dp),
@@ -201,34 +275,42 @@ fun SurpriseMeSheet(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(20.dp),
+                                .padding(18.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = BrandBlue.copy(alpha = 0.12f)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "📍 ${currentRestaurant.name}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = BrandBlue,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                )
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = BrandBlue.copy(alpha = 0.12f)
+                                ) {
+                                    Text(
+                                        text = "📍 ${currentRestaurant.name}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = BrandBlue,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
+
+                                StatusBadge(status = currentRestaurant.status)
                             }
 
                             Spacer(modifier = Modifier.height(14.dp))
 
                             Text(
                                 text = currentMeal.name,
-                                style = MaterialTheme.typography.headlineSmall,
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.ExtraBold,
                                 textAlign = TextAlign.Center,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 lineHeight = 28.sp
                             )
 
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
                             Text(
                                 text = "${currentMeal.category} • Student ${currentMeal.studentPrice ?: "€3.10"}",
@@ -237,9 +319,8 @@ fun SurpriseMeSheet(
                                 fontWeight = FontWeight.SemiBold
                             )
 
-                            Spacer(modifier = Modifier.height(14.dp))
-
                             if (currentMeal.dietaryBadges.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(12.dp))
                                 FlowRow(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -253,7 +334,7 @@ fun SurpriseMeSheet(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // Actions
                 Row(
@@ -266,11 +347,11 @@ fun SurpriseMeSheet(
                             hasEatenRecorded = false
                         },
                         shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.weight(1f).height(48.dp)
+                        modifier = Modifier.weight(1f).height(48.dp).testTag("surprise_try_another_button")
                     ) {
                         Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Roll again 🎲", fontWeight = FontWeight.SemiBold)
+                        Text("Try another 🎲", fontWeight = FontWeight.SemiBold)
                     }
 
                     Button(
@@ -282,16 +363,16 @@ fun SurpriseMeSheet(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (hasEatenRecorded) Color(0xFF059669) else BrandBlue
                         ),
-                        modifier = Modifier.weight(1f).height(48.dp)
+                        modifier = Modifier.weight(1f).height(48.dp).testTag("surprise_eat_this_button")
                     ) {
                         Icon(
-                            imageVector = if (hasEatenRecorded) Icons.Default.Check else Icons.Default.Check,
+                            imageVector = Icons.Default.Check,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (hasEatenRecorded) "Marked as eaten!" else "Eat this! 😋",
+                            text = if (hasEatenRecorded) "Logged! 😋" else "I ate this 😋",
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -302,13 +383,25 @@ fun SurpriseMeSheet(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "No dishes found matching this filter at your favourite UniCafes today.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(24.dp)
-                    )
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "No dishes found matching this filter at ${if (onlyFavorites) "your favourite" else "any"} UniCafes today.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (onlyFavorites) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = { onlyFavorites = false; rollSeed++ }
+                            ) {
+                                Text("Check all UniCafes")
+                            }
+                        }
+                    }
                 }
             }
 

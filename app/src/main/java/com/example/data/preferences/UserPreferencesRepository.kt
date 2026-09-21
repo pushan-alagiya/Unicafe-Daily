@@ -14,6 +14,7 @@ import com.example.domain.model.Campus
 import com.example.domain.model.DietaryFilter
 import com.example.domain.model.EatenMealRecord
 import com.example.domain.model.MyDietPreference
+import com.example.domain.model.RecentlyViewedDish
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -27,15 +28,21 @@ class UserPreferencesRepository(private val context: Context) {
 
     companion object {
         private val KEY_FAVORITES = stringSetPreferencesKey("favorite_restaurant_ids")
+        private val KEY_ORDERED_FAVORITES = stringPreferencesKey("ordered_favorite_restaurant_ids")
         private val KEY_DIETARY_FILTER = stringPreferencesKey("selected_dietary_filter")
+        private val KEY_STATUS_FILTER = stringPreferencesKey("restaurant_status_filter")
+        private val KEY_APP_LANGUAGE = stringPreferencesKey("app_language")
         private val KEY_LAST_REFRESHED = longPreferencesKey("last_refreshed_timestamp")
         private val KEY_CACHED_JSON = stringPreferencesKey("cached_restaurants_json")
+        private val KEY_CACHED_JSON_LANG = stringPreferencesKey("cached_restaurants_json_lang")
         private val KEY_FAVORITE_MEALS = stringSetPreferencesKey("favorite_meal_names")
         private val KEY_MY_DIET = stringPreferencesKey("my_diet_preference")
         private val KEY_HIDE_NON_MATCHING = booleanPreferencesKey("hide_non_matching_meals")
         private val KEY_CAMPUS = stringPreferencesKey("campus_preference")
         private val KEY_EATEN_MEALS_JSON = stringPreferencesKey("eaten_meals_json")
         private val KEY_NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
+        private val KEY_MONTHLY_BUDGET_EUR = stringPreferencesKey("monthly_budget_eur")
+        private val KEY_RECENTLY_VIEWED_JSON = stringPreferencesKey("recently_viewed_dishes_json")
 
         @Volatile
         private var INSTANCE: UserPreferencesRepository? = null
@@ -50,16 +57,38 @@ class UserPreferencesRepository(private val context: Context) {
     private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
     private val eatenMealsListType = Types.newParameterizedType(List::class.java, EatenMealRecord::class.java)
     private val eatenMealsAdapter = moshi.adapter<List<EatenMealRecord>>(eatenMealsListType)
+    private val recentlyViewedListType = Types.newParameterizedType(List::class.java, RecentlyViewedDish::class.java)
+    private val recentlyViewedAdapter = moshi.adapter<List<RecentlyViewedDish>>(recentlyViewedListType)
 
-    val favoriteRestaurantIdsFlow: Flow<Set<Int>> = context.dataStore.data
+    val orderedFavoriteRestaurantIdsFlow: Flow<List<Int>> = context.dataStore.data
         .map { prefs ->
-            val set = prefs[KEY_FAVORITES]
-            if (set.isNullOrEmpty()) {
-                ApiConfig.DEFAULT_FAVORITE_IDS.toSet()
+            val orderedStr = prefs[KEY_ORDERED_FAVORITES]
+            if (!orderedStr.isNullOrBlank()) {
+                orderedStr.split(",")
+                    .mapNotNull { it.trim().toIntOrNull() }
+                    .distinct()
+                    .take(ApiConfig.MAX_FAVORITES)
             } else {
-                set.mapNotNull { it.toIntOrNull() }.take(ApiConfig.MAX_FAVORITES).toSet()
+                val set = prefs[KEY_FAVORITES]
+                if (set.isNullOrEmpty()) {
+                    ApiConfig.DEFAULT_FAVORITE_IDS
+                } else {
+                    set.mapNotNull { it.toIntOrNull() }.take(ApiConfig.MAX_FAVORITES)
+                }
             }
         }
+        .distinctUntilChanged()
+
+    val favoriteRestaurantIdsFlow: Flow<Set<Int>> = orderedFavoriteRestaurantIdsFlow
+        .map { it.toSet() }
+        .distinctUntilChanged()
+
+    val appLanguageFlow: Flow<String> = context.dataStore.data
+        .map { prefs -> prefs[KEY_APP_LANGUAGE] ?: "en" }
+        .distinctUntilChanged()
+
+    val statusFilterFlow: Flow<String> = context.dataStore.data
+        .map { prefs -> prefs[KEY_STATUS_FILTER] ?: "ALL" }
         .distinctUntilChanged()
 
     val dietaryFilterFlow: Flow<DietaryFilter> = context.dataStore.data
@@ -79,6 +108,10 @@ class UserPreferencesRepository(private val context: Context) {
 
     val cachedJsonFlow: Flow<String?> = context.dataStore.data
         .map { prefs -> prefs[KEY_CACHED_JSON] }
+        .distinctUntilChanged()
+
+    val cachedJsonLangFlow: Flow<String?> = context.dataStore.data
+        .map { prefs -> prefs[KEY_CACHED_JSON_LANG] }
         .distinctUntilChanged()
 
     val favoriteMealNamesFlow: Flow<Set<String>> = context.dataStore.data
@@ -130,10 +163,50 @@ class UserPreferencesRepository(private val context: Context) {
         .map { prefs -> prefs[KEY_NOTIFICATIONS_ENABLED] ?: false }
         .distinctUntilChanged()
 
+    val monthlyBudgetEurFlow: Flow<Double?> = context.dataStore.data
+        .map { prefs -> prefs[KEY_MONTHLY_BUDGET_EUR]?.toDoubleOrNull() }
+        .distinctUntilChanged()
+
+    val recentlyViewedFlow: Flow<List<RecentlyViewedDish>> = context.dataStore.data
+        .map { prefs ->
+            val json = prefs[KEY_RECENTLY_VIEWED_JSON]
+            if (json.isNullOrBlank()) {
+                emptyList()
+            } else {
+                try {
+                    recentlyViewedAdapter.fromJson(json) ?: emptyList()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+        }
+        .distinctUntilChanged()
+
     suspend fun saveFavorites(favoriteIds: Set<Int>) {
-        val limited = favoriteIds.take(ApiConfig.MAX_FAVORITES).map { it.toString() }.toSet()
+        val limited = favoriteIds.take(ApiConfig.MAX_FAVORITES)
         context.dataStore.edit { prefs ->
-            prefs[KEY_FAVORITES] = limited
+            prefs[KEY_FAVORITES] = limited.map { it.toString() }.toSet()
+            prefs[KEY_ORDERED_FAVORITES] = limited.joinToString(",")
+        }
+    }
+
+    suspend fun saveOrderedFavorites(orderedIds: List<Int>) {
+        val limited = orderedIds.distinct().take(ApiConfig.MAX_FAVORITES)
+        context.dataStore.edit { prefs ->
+            prefs[KEY_FAVORITES] = limited.map { it.toString() }.toSet()
+            prefs[KEY_ORDERED_FAVORITES] = limited.joinToString(",")
+        }
+    }
+
+    suspend fun saveAppLanguage(languageCode: String) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_APP_LANGUAGE] = languageCode
+        }
+    }
+
+    suspend fun saveStatusFilter(filter: String) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_STATUS_FILTER] = filter
         }
     }
 
@@ -143,9 +216,10 @@ class UserPreferencesRepository(private val context: Context) {
         }
     }
 
-    suspend fun saveCachedJson(json: String, timestamp: Long = System.currentTimeMillis()) {
+    suspend fun saveCachedJson(json: String, lang: String = "en", timestamp: Long = System.currentTimeMillis()) {
         context.dataStore.edit { prefs ->
             prefs[KEY_CACHED_JSON] = json
+            prefs[KEY_CACHED_JSON_LANG] = lang
             prefs[KEY_LAST_REFRESHED] = timestamp
         }
     }
@@ -214,6 +288,37 @@ class UserPreferencesRepository(private val context: Context) {
     suspend fun setNotificationsEnabled(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[KEY_NOTIFICATIONS_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveMonthlyBudget(budget: Double?) {
+        context.dataStore.edit { prefs ->
+            if (budget != null && budget > 0) {
+                prefs[KEY_MONTHLY_BUDGET_EUR] = budget.toString()
+            } else {
+                prefs.remove(KEY_MONTHLY_BUDGET_EUR)
+            }
+        }
+    }
+
+    suspend fun recordRecentlyViewed(dish: RecentlyViewedDish) {
+        context.dataStore.edit { prefs ->
+            val json = prefs[KEY_RECENTLY_VIEWED_JSON]
+            val currentList = if (!json.isNullOrBlank()) {
+                try { recentlyViewedAdapter.fromJson(json)?.toMutableList() ?: mutableListOf() } catch (_: Exception) { mutableListOf() }
+            } else {
+                mutableListOf()
+            }
+            // Remove existing if matching meal name and restaurant
+            currentList.removeAll { it.mealName.equals(dish.mealName, ignoreCase = true) && it.restaurantName.equals(dish.restaurantName, ignoreCase = true) }
+            currentList.add(0, dish)
+            prefs[KEY_RECENTLY_VIEWED_JSON] = recentlyViewedAdapter.toJson(currentList.take(20))
+        }
+    }
+
+    suspend fun clearRecentlyViewed() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(KEY_RECENTLY_VIEWED_JSON)
         }
     }
 }

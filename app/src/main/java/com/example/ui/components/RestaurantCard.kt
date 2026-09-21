@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -17,10 +19,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,33 +48,36 @@ fun RestaurantCard(
     selectedFilter: DietaryFilter,
     favoriteMealNames: Set<String> = emptySet(),
     eatenMealNames: Set<String> = emptySet(),
+    dateFormatted: String = "",
     onToggleFavoriteMeal: ((String) -> Unit)? = null,
     onMealClick: (Meal, Restaurant) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+
     // Filter meals by selected diet
     val filteredMeals = restaurant.todaysMeals.filter { meal ->
         selectedFilter.matches(meal.dietaryBadges)
     }
 
     Card(
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp),
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(vertical = 3.dp)
             .testTag("restaurant_card_${restaurant.id}")
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp)
+                .padding(14.dp)
         ) {
-            // Header Row: Restaurant Name + Status Badge
+            // Header Row: Restaurant Name + Status Badge & Share
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -112,8 +120,22 @@ fun RestaurantCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
-                StatusBadge(status = restaurant.status)
+                Spacer(modifier = Modifier.width(6.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    StatusBadge(status = restaurant.status)
+                    IconButton(
+                        onClick = { shareRestaurantMenu(context, restaurant, dateFormatted) },
+                        modifier = Modifier.size(32.dp).testTag("share_restaurant_${restaurant.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share menu",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(17.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -252,3 +274,38 @@ private fun EmptyMenuState(
         )
     }
 }
+
+private fun shareRestaurantMenu(context: Context, restaurant: Restaurant, dateFormatted: String) {
+    try {
+        val builder = StringBuilder()
+        builder.append("🍽️ UniCafe ${restaurant.name}\n")
+        if (dateFormatted.isNotBlank()) {
+            builder.append("📅 $dateFormatted\n")
+        }
+        builder.append("🕒 Lunch: ${restaurant.status.hoursDescription}\n\n")
+
+        if (restaurant.todaysMeals.isEmpty()) {
+            builder.append("No menu available for this date.\n")
+        } else {
+            restaurant.todaysMeals.forEach { meal ->
+                val badges = if (meal.dietaryBadges.isNotEmpty()) " [${meal.dietaryBadges.joinToString()}]" else ""
+                val price = meal.studentPrice?.let { " - $it" } ?: ""
+                builder.append("• ${meal.name}$badges$price (${meal.category})\n")
+            }
+        }
+        builder.append("\nCheck all menus on UniCafe Daily!")
+
+        val sendIntent = Intent().apply {
+            action = Intent.ACTION_SEND
+            putExtra(Intent.EXTRA_TEXT, builder.toString())
+            type = "text/plain"
+        }
+        val chooser = Intent.createChooser(sendIntent, "Share ${restaurant.name} menu").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
+    } catch (e: Exception) {
+        android.util.Log.e("RestaurantCard", "Failed to share menu", e)
+    }
+}
+

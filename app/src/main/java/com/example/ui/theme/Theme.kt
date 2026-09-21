@@ -12,10 +12,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = BrandBlueLight,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFF1E3A8A),
-    onPrimaryContainer = Color(0xFFDBEAFE),
+    primary = Color(0xFFFAFAFA),
+    onPrimary = Color(0xFF121212),
+    primaryContainer = Color(0xFF242428),
+    onPrimaryContainer = Color(0xFFF4F4F6),
     secondary = BrandCoral,
     onSecondary = Color.White,
     background = DarkCanvas,
@@ -23,7 +23,14 @@ private val DarkColorScheme = darkColorScheme(
     surface = DarkCard,
     onSurface = DarkTextPrimary,
     surfaceVariant = DarkCardBorder,
-    onSurfaceVariant = DarkTextSecondary
+    onSurfaceVariant = DarkTextSecondary,
+    surfaceContainerLowest = DarkCanvas,
+    surfaceContainerLow = DarkSurfaceContainerLow,
+    surfaceContainer = DarkCard,
+    surfaceContainerHigh = DarkSurfaceContainerHigh,
+    surfaceContainerHighest = Color(0xFF2A2A2E),
+    outline = DarkCardBorder,
+    outlineVariant = Color(0xFF333338)
 )
 
 private val LightColorScheme = lightColorScheme(

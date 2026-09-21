@@ -17,18 +17,23 @@ val LightTextPrimary = Color(0xFF0F172A)  // Deep slate
 val LightTextSecondary = Color(0xFF64748B)// Neutral slate
 val LightTextMuted = Color(0xFF94A3B8)    // Light subtle slate
 
-// Dark Mode Surfaces & Canvas
-val DarkCanvas = Color(0xFF0B1120)        // Deep midnight slate
-val DarkCard = Color(0xFF1E293B)          // Elevated slate surface
-val DarkCardBorder = Color(0xFF334155)    // Dark border
-val DarkTextPrimary = Color(0xFFF8FAFC)   // Crisp light text
-val DarkTextSecondary = Color(0xFF94A3B8) // Soft slate text
-val DarkTextMuted = Color(0xFF64748B)     // Muted slate
+// Dark Mode Surfaces & Canvas - Pure Deep Dark / Neutral Charcoal OLED (Zero blue tint)
+val DarkCanvas = Color(0xFF000000)        // Pure deep black background
+val DarkCard = Color(0xFF141416)          // Neutral dark card surface
+val DarkCardBorder = Color(0xFF242428)    // Clean neutral dark border
+val DarkSurfaceContainerHigh = Color(0xFF1E1E22) // Elevated surface
+val DarkSurfaceContainerLow = Color(0xFF0A0A0C)
+val DarkTextPrimary = Color(0xFFF4F4F6)   // Crisp light text
+val DarkTextSecondary = Color(0xFFA1A1AA) // Soft neutral gray
+val DarkTextMuted = Color(0xFF71717A)     // Muted neutral gray
 
 // Status Colors - Light
 val StatusOpenGreen = Color(0xFF059669)
 val StatusOpenGreenBg = Color(0xFFD1FAE5)
 val StatusOpenGreenText = Color(0xFF065F46)
+val StatusOpeningSoonAmber = Color(0xFFD97706)
+val StatusOpeningSoonBg = Color(0xFFFEF3C7)
+val StatusOpeningSoonText = Color(0xFF92400E)
 val StatusClosedRed = Color(0xFFDC2626)
 val StatusClosedRedBg = Color(0xFFFEE2E2)
 val StatusClosedRedText = Color(0xFF991B1B)
@@ -36,6 +41,8 @@ val StatusClosedRedText = Color(0xFF991B1B)
 // Status Colors - Dark
 val StatusOpenGreenBgDark = Color(0xFF064E3B)
 val StatusOpenGreenTextDark = Color(0xFF6EE7B7)
+val StatusOpeningSoonBgDark = Color(0xFF78350F)
+val StatusOpeningSoonTextDark = Color(0xFFFDE68A)
 val StatusClosedRedBgDark = Color(0xFF7F1D1D)
 val StatusClosedRedTextDark = Color(0xFFFCA5A5)
 
@@ -52,6 +59,8 @@ val BadgeAllergenBg = Color(0xFFFFF1F2)
 val BadgeAllergenText = Color(0xFFBE123C)
 val BadgeNeutralBg = Color(0xFFF1F5F9)
 val BadgeNeutralText = Color(0xFF475569)
+val BadgeKelaBg = Color(0xFFEFF6FF)
+val BadgeKelaText = Color(0xFF1D4ED8)
 
 // Dietary & Food Category Badges - Dark
 val BadgeVeganBgDark = Color(0xFF064E3B)
@@ -66,6 +75,8 @@ val BadgeAllergenBgDark = Color(0xFF881337)
 val BadgeAllergenTextDark = Color(0xFFFDA4AF)
 val BadgeNeutralBgDark = Color(0xFF334155)
 val BadgeNeutralTextDark = Color(0xFFCBD5E1)
+val BadgeKelaBgDark = Color(0xFF1E3A8A)
+val BadgeKelaTextDark = Color(0xFF93C5FD)
 
 // Macro Nutrient Card Colors - Light
 val CalorieCardBg = Color(0xFFFEF3C7)

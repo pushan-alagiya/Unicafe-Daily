@@ -57,7 +57,9 @@ fun FavoritePickerSheet(
     modifier: Modifier = Modifier
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var selectedIds by remember { mutableStateOf(currentFavoriteIds.toMutableSet()) }
+    var selectedIds by remember {
+        mutableStateOf(currentFavoriteIds.map { com.example.data.mapper.RestaurantCanonicalMapper.getCanonicalId(it) }.toMutableSet())
+    }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -167,7 +169,8 @@ fun FavoritePickerSheet(
                     }
 
                     items(restaurants, key = { it.id }) { restaurant ->
-                        val isChecked = selectedIds.contains(restaurant.id)
+                        val canonicalId = com.example.data.mapper.RestaurantCanonicalMapper.getCanonicalId(restaurant.id, restaurant.slug)
+                        val isChecked = selectedIds.contains(canonicalId)
 
                         Row(
                             modifier = Modifier
@@ -175,10 +178,10 @@ fun FavoritePickerSheet(
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable {
                                     if (isChecked) {
-                                        selectedIds = (selectedIds - restaurant.id).toMutableSet()
+                                        selectedIds = (selectedIds - canonicalId).toMutableSet()
                                     } else {
                                         if (selectedIds.size < ApiConfig.MAX_FAVORITES) {
-                                            selectedIds = (selectedIds + restaurant.id).toMutableSet()
+                                            selectedIds = (selectedIds + canonicalId).toMutableSet()
                                         } else {
                                             scope.launch {
                                                 snackbarHostState.showSnackbar("You can only select up to ${ApiConfig.MAX_FAVORITES} favorites.")
@@ -194,14 +197,14 @@ fun FavoritePickerSheet(
                                 onCheckedChange = { checked ->
                                     if (checked) {
                                         if (selectedIds.size < ApiConfig.MAX_FAVORITES) {
-                                            selectedIds = (selectedIds + restaurant.id).toMutableSet()
+                                            selectedIds = (selectedIds + canonicalId).toMutableSet()
                                         } else {
                                             scope.launch {
                                                 snackbarHostState.showSnackbar("You can only select up to ${ApiConfig.MAX_FAVORITES} favorites.")
                                             }
                                         }
                                     } else {
-                                        selectedIds = (selectedIds - restaurant.id).toMutableSet()
+                                        selectedIds = (selectedIds - canonicalId).toMutableSet()
                                     }
                                 },
                                 modifier = Modifier.testTag("checkbox_${restaurant.id}")

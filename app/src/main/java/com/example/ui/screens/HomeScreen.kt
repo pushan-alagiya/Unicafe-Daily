@@ -3,14 +3,13 @@ package com.example.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,34 +19,32 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Casino
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DirectionsWalk
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -62,155 +59,150 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.domain.model.DietaryFilter
 import com.example.domain.model.Meal
-import com.example.domain.model.MyDietPreference
 import com.example.domain.model.Restaurant
-import com.example.ui.components.BudgetHistorySheet
-import com.example.ui.components.DietaryFilterChips
-import com.example.ui.components.FavoritePickerSheet
-import com.example.ui.components.FoodDetailSheet
-import com.example.ui.components.LeavingForLunchSheet
 import com.example.ui.components.RestaurantCard
 import com.example.ui.components.StaleDataBanner
-import com.example.ui.components.SurpriseMeSheet
 import com.example.ui.state.HomeUiState
 import com.example.ui.theme.BrandBlue
-import java.util.Locale
+
+import androidx.compose.material.icons.filled.Tune
+import com.example.ui.components.DietaryFilterChips
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     uiState: HomeUiState,
     onRefreshClicked: () -> Unit,
-    onFilterSelected: (DietaryFilter) -> Unit,
     onOpenFavoritePicker: () -> Unit,
-    onDismissFavoritePicker: () -> Unit,
-    onSaveFavorites: (Set<Int>) -> Unit,
-    onOpenLeavingForLunch: () -> Unit,
-    onDismissLeavingForLunch: () -> Unit,
-    onOpenSurpriseMe: () -> Unit,
-    onDismissSurpriseMe: () -> Unit,
-    onOpenBudgetHistory: () -> Unit,
-    onDismissBudgetHistory: () -> Unit,
-    onToggleFavoriteMeal: (String) -> Unit,
-    onRecordEatenMeal: (Meal, String) -> Unit,
-    onDeleteEatenMeal: (String) -> Unit,
-    onSetMyDiet: (MyDietPreference) -> Unit,
-    onToggleHideNonMatching: (Boolean) -> Unit,
-    onDismissMenuNotice: () -> Unit,
+    onOpenFilterSheet: () -> Unit = {},
+    onDietaryFilterSelected: (DietaryFilter) -> Unit = {},
+    onOpenDietaryLegend: () -> Unit = {},
+    onOpenLeavingForLunch: () -> Unit = {},
+    onOpenSurpriseMe: () -> Unit = {},
+    onOpenBudgetHistory: () -> Unit = {},
+    onToggleFavoriteMeal: (String) -> Unit = {},
+    onMealClick: (Meal, String) -> Unit = { _, _ -> },
+    onDismissMenuNotice: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var selectedMealForDetail by remember { mutableStateOf<Pair<Meal, Restaurant>?>(null) }
-    var searchQuery by remember { mutableStateOf("") }
-    val isDark = isSystemInDarkTheme()
+    var selectedFavoriteRestId by remember { mutableStateOf<Int?>(null) }
+
+    val displayDate = remember(uiState.formattedDate, uiState.appLanguage) {
+        if (uiState.formattedDate.isNotBlank()) {
+            uiState.formattedDate
+        } else {
+            val locale = when (uiState.appLanguage) {
+                "fi" -> java.util.Locale("fi", "FI")
+                "sv" -> java.util.Locale("sv", "SE")
+                else -> java.util.Locale.ENGLISH
+            }
+            java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE, d.M.", locale))
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = BrandBlue,
-                            modifier = Modifier.size(38.dp)
+                            modifier = Modifier.size(32.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Restaurant,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column {
                             Text(
-                                text = "UniCafe Daily",
-                                style = MaterialTheme.typography.titleLarge,
+                                text = stringResource(R.string.app_name),
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 19.sp
+                                maxLines = 1
                             )
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.CalendarToday,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(11.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
                                 Text(
-                                    text = uiState.formattedDate,
+                                    text = displayDate,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 11.sp,
+                                    maxLines = 1
                                 )
                             }
                         }
                     }
                 },
                 actions = {
-                    // Manage Favorites Button with count badge
-                    Surface(
-                        onClick = onOpenFavoritePicker,
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier
-                            .testTag("choose_favorites_button")
-                            .semantics { contentDescription = "Choose favorite restaurants" }
+                    // Filter Action Button to open filters sheet
+                    IconButton(
+                        onClick = onOpenFilterSheet,
+                        modifier = Modifier.testTag("home_filter_button")
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Tune,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "${uiState.favoriteRestaurants.size}/3",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = stringResource(R.string.filter_button),
+                            tint = if (uiState.selectedFilter != DietaryFilter.ALL || uiState.statusFilter != "ALL") BrandBlue else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
 
-                    Spacer(modifier = Modifier.width(4.dp))
+                    // Manage Favorites Action
+                    IconButton(
+                        onClick = onOpenFavoritePicker,
+                        modifier = Modifier.testTag("manage_favorites_appbar_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = stringResource(R.string.choose_favorites),
+                            tint = Color(0xFFD97706)
+                        )
+                    }
 
-                    // Refresh Button with progress indicator
+                    // Refresh Button
                     IconButton(
                         onClick = onRefreshClicked,
                         enabled = !uiState.isRefreshing,
-                        modifier = Modifier
-                            .testTag("refresh_button")
-                            .semantics { contentDescription = "Refresh menu" }
+                        modifier = Modifier.testTag("refresh_button")
                     ) {
                         if (uiState.isRefreshing) {
                             CircularProgressIndicator(
-                                strokeWidth = 2.5.dp,
-                                modifier = Modifier.size(20.dp),
-                                color = MaterialTheme.colorScheme.primary
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = BrandBlue
                             )
                         } else {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
-                                contentDescription = "Refresh",
-                                tint = MaterialTheme.colorScheme.primary
+                                contentDescription = stringResource(R.string.refresh),
+                                tint = BrandBlue
                             )
                         }
                     }
@@ -220,56 +212,60 @@ fun HomeScreen(
                 )
             )
         },
-        containerColor = MaterialTheme.colorScheme.background,
-        modifier = modifier.testTag("home_screen")
-    ) { paddingValues ->
+        modifier = modifier.fillMaxSize().testTag("home_screen")
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(innerPadding)
         ) {
-            // Stale Data Warning Banner (when offline / using cache)
-            if (uiState.isDataStale || (uiState.errorMessage != null && uiState.favoriteRestaurants.isNotEmpty())) {
+            // Stale Data Notice Banner
+            if (uiState.isDataStale && uiState.lastUpdatedText != null) {
                 StaleDataBanner(
                     lastUpdatedText = uiState.lastUpdatedText,
                     onRetry = onRefreshClicked
                 )
             }
 
-            // Menu Notice Banner (e.g., changes detected)
-            if (uiState.menuChangeNotice != null) {
+            // Menu change notice banner if any
+            uiState.menuChangeNotice?.let { notice ->
                 Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
                     shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFFEF3C7),
+                    border = BorderStroke(1.dp, Color(0xFFFDE68A)),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .testTag("menu_change_banner")
                 ) {
                     Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = uiState.menuChangeNotice,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.weight(1f)
-                        )
+                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = Color(0xFFB45309),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = notice,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF92400E),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                         IconButton(
                             onClick = onDismissMenuNotice,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(24.dp).testTag("dismiss_menu_change_notice")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Dismiss notice",
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                tint = Color(0xFFB45309),
                                 modifier = Modifier.size(14.dp)
                             )
                         }
@@ -277,494 +273,210 @@ fun HomeScreen(
                 }
             }
 
-            // Quick Search / Dish Finder Bar (Fixed UI: Uses BasicTextField to eliminate top clipping)
-            if (uiState.favoriteRestaurants.isNotEmpty()) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
-                    ),
+            // Error View
+            if (uiState.errorMessage != null && uiState.allRestaurants.isEmpty()) {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        BasicTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 14.sp
-                            ),
-                            singleLine = true,
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            decorationBox = { innerTextField ->
-                                Box(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    contentAlignment = Alignment.CenterStart
-                                ) {
-                                    if (searchQuery.isEmpty()) {
-                                        Text(
-                                            text = "Search today's dishes (e.g. tofu, lohi, pasta)...",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontSize = 13.5.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-                                        )
-                                    }
-                                    innerTextField()
-                                }
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("search_meals_input")
-                        )
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(
-                                onClick = { searchQuery = "" },
-                                modifier = Modifier.size(24.dp)
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = uiState.errorMessage ?: "Network connection error",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = onRefreshClicked,
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                            ) {
+                                Text(stringResource(R.string.retry))
+                            }
+                        }
+                    }
+                }
+                return@Scaffold
+            }
+
+            // Loading state
+            if (uiState.isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = BrandBlue)
+                }
+                return@Scaffold
+            }
+
+            val favorites = uiState.favoriteRestaurants
+
+            // If user has NO favorite UniCafes selected
+            if (favorites.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFFEF3C7)),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Clear,
-                                    contentDescription = "Clear search",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = Color(0xFFB45309),
+                                    modifier = Modifier.size(30.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Text(
+                                text = stringResource(R.string.no_favorites_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Text(
+                                text = stringResource(R.string.no_favorites_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                lineHeight = 18.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(20.dp))
+
+                            Button(
+                                onClick = onOpenFavoritePicker,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = BrandBlue),
+                                modifier = Modifier.testTag("home_choose_favorites_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
                                     modifier = Modifier.size(16.dp)
                                 )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Quick Options & Shortcuts Row: Equal-sized, clean pills
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 1. "Leaving for lunch?" Quick View Pill
-                val openCount = uiState.favoriteRestaurants.count { it.status.isOpenNow }
-                QuickOptionPill(
-                    icon = Icons.Default.DirectionsWalk,
-                    title = "Leaving for lunch?",
-                    badgeText = if (openCount > 0) "$openCount Open" else "Closed",
-                    badgeColor = if (openCount > 0) Color(0xFF10B981) else Color(0xFFEF4444),
-                    onClick = onOpenLeavingForLunch,
-                    testTag = "pill_leaving_for_lunch"
-                )
-
-                // 2. "Surprise me" Random Picker Pill
-                QuickOptionPill(
-                    icon = Icons.Default.Casino,
-                    title = "Surprise Me",
-                    badgeText = "Dice",
-                    badgeColor = BrandBlue,
-                    onClick = onOpenSurpriseMe,
-                    testTag = "pill_surprise_me"
-                )
-
-                // 3. Lunch Budget Tracker & Meal History Pill
-                val spentFormatted = String.format(Locale.US, "€%.2f", uiState.monthlySpentEur)
-                QuickOptionPill(
-                    icon = Icons.Default.AccountBalanceWallet,
-                    title = "Budget Tracker",
-                    badgeText = spentFormatted,
-                    badgeColor = Color(0xFFF59E0B),
-                    onClick = onOpenBudgetHistory,
-                    testTag = "pill_budget_tracker"
-                )
-
-                // 4. "My diet" quick mode pill
-                val dietLabel = when (uiState.myDietPreference) {
-                    MyDietPreference.NONE -> "My Diet: None"
-                    MyDietPreference.VEGAN -> "Diet: Vegan"
-                    MyDietPreference.GLUTEN_FREE -> "Diet: Gluten-free"
-                    MyDietPreference.MILK_FREE -> "Diet: Milk-free"
-                }
-                QuickOptionPill(
-                    icon = Icons.Default.FilterList,
-                    title = dietLabel,
-                    badgeText = if (uiState.hideNonMatchingMeals) "Relevant Only" else "All shown",
-                    badgeColor = if (uiState.hideNonMatchingMeals) BrandBlue else MaterialTheme.colorScheme.onSurfaceVariant,
-                    onClick = {
-                        // Toggle hide non-matching
-                        onToggleHideNonMatching(!uiState.hideNonMatchingMeals)
-                    },
-                    testTag = "pill_my_diet"
-                )
-            }
-
-            // Dietary Filter Chips Row (All, Veg, G, M)
-            DietaryFilterChips(
-                selectedFilter = uiState.selectedFilter,
-                onFilterSelected = onFilterSelected
-            )
-
-            // Content Area
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                when {
-                    uiState.isLoading && uiState.favoriteRestaurants.isEmpty() -> {
-                        // Full Screen Loading State
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                CircularProgressIndicator(color = BrandBlue)
-                                Spacer(modifier = Modifier.height(14.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Loading University of Helsinki menus...",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.Medium
+                                    text = stringResource(R.string.add_favorites_btn),
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
                     }
+                }
+            } else {
+                // If user has multiple favorites, offer a clean, minimal switcher bar
+                if (favorites.size > 1) {
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = selectedFavoriteRestId == null,
+                                onClick = { selectedFavoriteRestId = null },
+                                label = {
+                                    Text(
+                                        text = "${stringResource(R.string.favorites)} (${favorites.size})",
+                                        fontSize = 12.sp,
+                                        fontWeight = if (selectedFavoriteRestId == null) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = BrandBlue,
+                                    selectedLabelColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.testTag("fav_chip_all")
+                            )
+                        }
 
-                    uiState.favoriteRestaurants.isEmpty() && uiState.errorMessage != null -> {
-                        // Network Error with no cache
-                        NoNetworkErrorState(
-                            message = uiState.errorMessage,
-                            onRetry = onRefreshClicked
+                        items(favorites, key = { "fav_tab_${it.id}" }) { restaurant ->
+                            val isSelected = selectedFavoriteRestId == restaurant.id
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    selectedFavoriteRestId = if (isSelected) null else restaurant.id
+                                },
+                                label = {
+                                    Text(
+                                        text = restaurant.name,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = BrandBlue,
+                                    selectedLabelColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.testTag("fav_chip_${restaurant.id}")
+                            )
+                        }
+                    }
+                }
+
+                val restaurantsToDisplay = if (selectedFavoriteRestId != null) {
+                    favorites.filter { it.id == selectedFavoriteRestId }
+                } else {
+                    favorites
+                }
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 84.dp)
+                ) {
+                    items(restaurantsToDisplay, key = { "fav_r_${it.id}" }) { restaurant ->
+                        RestaurantCard(
+                            restaurant = restaurant,
+                            selectedFilter = uiState.selectedFilter,
+                            favoriteMealNames = uiState.favoriteMealNames,
+                            eatenMealNames = uiState.eatenMeals.map { it.mealName }.toSet(),
+                            dateFormatted = uiState.formattedDate,
+                            onToggleFavoriteMeal = onToggleFavoriteMeal,
+                            onMealClick = { meal, rest -> onMealClick(meal, rest.name) }
                         )
                     }
-
-                    uiState.favoriteRestaurants.isEmpty() -> {
-                        // Empty Favorites State
-                        EmptyFavoritesState(onSelectFavorites = onOpenFavoritePicker)
-                    }
-
-                    else -> {
-                        // Filter restaurants and meals if search query active or hideNonMatchingMeals active
-                        val displayedRestaurants = uiState.favoriteRestaurants.map { rest ->
-                            var meals = rest.todaysMeals
-
-                            // Filter by search query
-                            if (searchQuery.isNotBlank()) {
-                                meals = meals.filter { meal ->
-                                    meal.name.contains(searchQuery, ignoreCase = true) ||
-                                            meal.category.contains(searchQuery, ignoreCase = true) ||
-                                            meal.dietaryBadges.any { it.contains(searchQuery, ignoreCase = true) }
-                                }
-                            }
-
-                            // Filter by hideNonMatchingMeals if enabled
-                            if (uiState.hideNonMatchingMeals && uiState.selectedFilter != DietaryFilter.ALL) {
-                                meals = meals.filter { meal ->
-                                    uiState.selectedFilter.matches(meal.dietaryBadges)
-                                }
-                            }
-
-                            rest.copy(todaysMeals = meals)
-                        }
-
-                        val eatenNames = remember(uiState.eatenMeals) {
-                            uiState.eatenMeals.map { it.mealName }.toSet()
-                        }
-
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            items(
-                                items = displayedRestaurants,
-                                key = { it.id }
-                            ) { restaurant ->
-                                RestaurantCard(
-                                    restaurant = restaurant,
-                                    selectedFilter = uiState.selectedFilter,
-                                    favoriteMealNames = uiState.favoriteMealNames,
-                                    eatenMealNames = eatenNames,
-                                    onToggleFavoriteMeal = onToggleFavoriteMeal,
-                                    onMealClick = { clickedMeal, rest ->
-                                        selectedMealForDetail = Pair(clickedMeal, rest)
-                                    }
-                                )
-                            }
-
-                            // Footer info
-                            item {
-                                FooterNote(
-                                    lastUpdatedText = uiState.lastUpdatedText,
-                                    onEditFavorites = onOpenFavoritePicker
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }
-    }
-
-    // Modal Bottom Sheet for selecting up to 3 favorites
-    if (uiState.showFavoritePicker) {
-        FavoritePickerSheet(
-            allRestaurants = uiState.allRestaurants,
-            currentFavoriteIds = uiState.favoriteIds,
-            onSaveFavorites = onSaveFavorites,
-            onDismiss = onDismissFavoritePicker
-        )
-    }
-
-    // "Leaving for lunch?" dedicated comparison sheet
-    if (uiState.showLeavingForLunchSheet) {
-        LeavingForLunchSheet(
-            favoriteRestaurants = uiState.favoriteRestaurants,
-            onSelectRestaurant = {
-                onDismissLeavingForLunch()
-            },
-            onDismiss = onDismissLeavingForLunch
-        )
-    }
-
-    // "Surprise me" random meal picker sheet
-    if (uiState.showSurpriseMeSheet) {
-        SurpriseMeSheet(
-            favoriteRestaurants = uiState.favoriteRestaurants.ifEmpty { uiState.allRestaurants },
-            onRecordEaten = onRecordEatenMeal,
-            onDismiss = onDismissSurpriseMe
-        )
-    }
-
-    // Lunch budget & meal history sheet
-    if (uiState.showBudgetHistorySheet) {
-        BudgetHistorySheet(
-            eatenMeals = uiState.eatenMeals,
-            onDeleteRecord = onDeleteEatenMeal,
-            onDismiss = onDismissBudgetHistory
-        )
-    }
-
-    // Interactive Food Detail Modal Sheet
-    selectedMealForDetail?.let { (meal, restaurant) ->
-        val isFav = uiState.favoriteMealNames.contains(meal.name)
-        val isEaten = uiState.eatenMeals.any { it.mealName == meal.name && it.restaurantName == restaurant.name }
-
-        FoodDetailSheet(
-            meal = meal,
-            restaurantName = restaurant.name,
-            isFavoriteMeal = isFav,
-            onToggleFavoriteMeal = { onToggleFavoriteMeal(meal.name) },
-            isEatenToday = isEaten,
-            onRecordEaten = { onRecordEatenMeal(meal, restaurant.name) },
-            onDismiss = { selectedMealForDetail = null }
-        )
-    }
-}
-
-@Composable
-private fun QuickOptionPill(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    badgeText: String,
-    badgeColor: Color,
-    onClick: () -> Unit,
-    testTag: String,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
-        ),
-        shadowElevation = 1.dp,
-        modifier = modifier
-            .height(38.dp)
-            .testTag(testTag)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 10.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 12.sp
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = badgeColor.copy(alpha = 0.15f)
-            ) {
-                Text(
-                    text = badgeText,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = badgeColor,
-                    fontSize = 10.sp,
-                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyFavoritesState(
-    onSelectFavorites: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-            modifier = Modifier.size(72.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Outlined.Restaurant,
-                    contentDescription = null,
-                    tint = BrandBlue,
-                    modifier = Modifier.size(36.dp)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(18.dp))
-        Text(
-            text = "Select Your UniCafes",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 18.sp
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "Pick up to 3 UniCafe restaurants (e.g. Kaivopiha, Exactum, Chemicum) to check lunch menus instantly from your home screen.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            lineHeight = 20.sp
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(
-            onClick = onSelectFavorites,
-            colors = ButtonDefaults.buttonColors(containerColor = BrandBlue),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-                .height(48.dp)
-                .testTag("empty_state_select_favorites_button")
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null)
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Select Favorites", fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-private fun NoNetworkErrorState(
-    message: String,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "Unable to load today's menu",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-        Button(
-            onClick = onRetry,
-            colors = ButtonDefaults.buttonColors(containerColor = BrandBlue),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .height(48.dp)
-                .testTag("error_retry_button")
-        ) {
-            Icon(Icons.Default.Refresh, contentDescription = null)
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Try Again", fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-private fun FooterNote(
-    lastUpdatedText: String?,
-    onEditFavorites: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        OutlinedButton(
-            onClick = onEditFavorites,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .height(48.dp)
-                .testTag("footer_edit_favorites_button")
-        ) {
-            Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Change Favorite UniCafes (max 3)")
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        Text(
-            text = if (lastUpdatedText != null)
-                "Synced at $lastUpdatedText • Student lunch €3.10"
-            else "UniCafe public menu • Student lunch €3.10",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-            fontSize = 11.sp
-        )
     }
 }

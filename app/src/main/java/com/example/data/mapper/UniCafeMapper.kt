@@ -37,6 +37,10 @@ object UniCafeMapper {
             mapToMeal(mealDto, "${dto.id}_${index}")
         } ?: emptyList()
 
+        val canonicalFavIds = favoriteIds.map { RestaurantCanonicalMapper.getCanonicalId(it) }.toSet()
+        val dtoCanonicalId = RestaurantCanonicalMapper.getCanonicalId(dto.id, dto.slug)
+        val isFav = canonicalFavIds.contains(dtoCanonicalId)
+
         return Restaurant(
             id = dto.id,
             name = dto.title.trim(),
@@ -49,7 +53,7 @@ object UniCafeMapper {
             status = status,
             todaysMeals = todaysMeals,
             menuDateDisplay = todayMenu?.date,
-            isFavorite = favoriteIds.contains(dto.id)
+            isFavorite = isFav
         )
     }
 
@@ -70,13 +74,19 @@ object UniCafeMapper {
         val rawAllergens = dto.meta?.get("1") ?: emptyList()
         val allergens = rawAllergens.map { it.trim() }.filter { it.isNotEmpty() }
 
-        // Extract carbon footprint from ingredients if formatted as "Hiilijalanjälki: X kg CO2e / annos"
+        // Extract carbon footprint from ingredients
         var carbonFootprint: String? = null
         var ingredientsCleaned = dto.ingredients?.trim()
-        if (ingredientsCleaned != null && ingredientsCleaned.contains("Hiilijalanjälki:", ignoreCase = true)) {
-            val idx = ingredientsCleaned.indexOf("Hiilijalanjälki:", ignoreCase = true)
-            carbonFootprint = ingredientsCleaned.substring(idx).trim()
-            ingredientsCleaned = ingredientsCleaned.substring(0, idx).trim().trimEnd('.', ',')
+        if (ingredientsCleaned != null) {
+            val keywords = listOf("Hiilijalanjälki:", "Carbon footprint:", "Koldioxidavtryck:")
+            for (kw in keywords) {
+                if (ingredientsCleaned!!.contains(kw, ignoreCase = true)) {
+                    val idx = ingredientsCleaned!!.indexOf(kw, ignoreCase = true)
+                    carbonFootprint = ingredientsCleaned!!.substring(idx).trim()
+                    ingredientsCleaned = ingredientsCleaned!!.substring(0, idx).trim().trimEnd('.', ',')
+                    break
+                }
+            }
         }
 
         val parsedNutrition = com.example.domain.model.NutritionInfo.parse(dto.nutrition)
@@ -151,6 +161,7 @@ object UniCafeMapper {
     ): RestaurantStatus {
         if (visitingHours == null) {
             return RestaurantStatus(
+                state = com.example.domain.model.StatusState.CLOSED,
                 isOpenNow = false,
                 displayText = "CLOSED • Hours unavailable",
                 shortStatus = "CLOSED",
@@ -165,6 +176,7 @@ object UniCafeMapper {
         val sectionToEvaluate = lunchSection ?: businessSection
         if (sectionToEvaluate == null || sectionToEvaluate.items.isNullOrEmpty()) {
             return RestaurantStatus(
+                state = com.example.domain.model.StatusState.CLOSED,
                 isOpenNow = false,
                 displayText = "CLOSED • No lunch service",
                 shortStatus = "CLOSED",
@@ -186,6 +198,7 @@ object UniCafeMapper {
                     exceptionItem.hours?.contains("suljettu", ignoreCase = true) == true
             if (isClosedException) {
                 return RestaurantStatus(
+                    state = com.example.domain.model.StatusState.CLOSED,
                     isOpenNow = false,
                     displayText = "CLOSED • Seasonally closed",
                     shortStatus = "CLOSED",
@@ -203,6 +216,7 @@ object UniCafeMapper {
         if (todayScheduleItem == null || todayScheduleItem.closedException == true || todayScheduleItem.hours?.contains("suljettu", ignoreCase = true) == true) {
             val nextText = if (nextOpeningDesc != null) " • $nextOpeningDesc" else ""
             return RestaurantStatus(
+                state = com.example.domain.model.StatusState.CLOSED,
                 isOpenNow = false,
                 displayText = "CLOSED • Closed today$nextText",
                 shortStatus = "CLOSED",
@@ -218,6 +232,7 @@ object UniCafeMapper {
         val parsedTimes = parseTimeRange(hoursStr)
         if (parsedTimes == null) {
             return RestaurantStatus(
+                state = com.example.domain.model.StatusState.CLOSED,
                 isOpenNow = false,
                 displayText = "CLOSED • $hoursStr",
                 shortStatus = "CLOSED",
@@ -235,13 +250,17 @@ object UniCafeMapper {
             val minutesUntilOpen = java.time.Duration.between(targetTime, startTime).toMinutes().coerceAtLeast(1)
             val h = minutesUntilOpen / 60
             val m = minutesUntilOpen % 60
-            val countStr = if (h > 0) "Opens in ${h}h ${m}m" else "Opens in ${m}m"
+            val countStr = if (h > 0) "${h}h ${m}m" else "${m} min"
+            val isOpeningSoon = minutesUntilOpen <= 60
+            val state = if (isOpeningSoon) com.example.domain.model.StatusState.OPENING_SOON else com.example.domain.model.StatusState.CLOSED
+
             RestaurantStatus(
+                state = state,
                 isOpenNow = false,
-                displayText = "CLOSED • Lunch $hoursDesc",
-                shortStatus = "CLOSED",
+                displayText = if (isOpeningSoon) "OPENING SOON • in $countStr" else "CLOSED • Lunch $hoursDesc",
+                shortStatus = if (isOpeningSoon) "OPENING SOON" else "CLOSED",
                 hoursDescription = "Lunch $hoursDesc",
-                countdownText = countStr,
+                countdownText = if (isOpeningSoon) "in $countStr" else "Opens at ${formatTime(startTime)}",
                 lunchEndTime = formattedEndTime,
                 nextOpeningText = "Opens today at ${formatTime(startTime)}"
             )
@@ -249,8 +268,9 @@ object UniCafeMapper {
             val minutesUntilClose = java.time.Duration.between(targetTime, endTime).toMinutes().coerceAtLeast(1)
             val h = minutesUntilClose / 60
             val m = minutesUntilClose % 60
-            val countStr = if (h > 0) "Open · ${h}h ${m}m left" else "Open · ${m} min left"
+            val countStr = if (h > 0) "${h}h ${m}m left" else "${m} min left"
             RestaurantStatus(
+                state = com.example.domain.model.StatusState.OPEN,
                 isOpenNow = true,
                 displayText = "OPEN • Lunch until $formattedEndTime",
                 shortStatus = "OPEN",
@@ -261,6 +281,7 @@ object UniCafeMapper {
             )
         } else {
             RestaurantStatus(
+                state = com.example.domain.model.StatusState.CLOSED,
                 isOpenNow = false,
                 displayText = "CLOSED • Lunch ended at $formattedEndTime",
                 shortStatus = "CLOSED",

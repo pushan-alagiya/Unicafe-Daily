@@ -15,27 +15,45 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.domain.model.EatenMealRecord
@@ -48,15 +66,23 @@ import java.util.Locale
 @Composable
 fun BudgetHistorySheet(
     eatenMeals: List<EatenMealRecord>,
+    monthlyBudgetEur: Double? = null,
+    onSaveMonthlyBudget: (Double?) -> Unit = {},
     onDeleteRecord: (String) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val focusManager = LocalFocusManager.current
 
     val totalSpent = eatenMeals.sumOf { it.priceEur }
     val lunchCount = eatenMeals.size
     val avgPrice = if (lunchCount > 0) totalSpent / lunchCount else 3.10
+
+    var isEditingBudget by remember { mutableStateOf(false) }
+    var budgetInput by remember(monthlyBudgetEur) {
+        mutableStateOf(monthlyBudgetEur?.let { String.format(Locale.ROOT, "%.2f", it) } ?: "")
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -93,7 +119,7 @@ fun BudgetHistorySheet(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "Lunch Budget Tracker",
+                            text = "Lunch Budget & History",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -106,7 +132,7 @@ fun BudgetHistorySheet(
                     }
                 }
 
-                IconButton(onClick = onDismiss) {
+                IconButton(onClick = onDismiss, modifier = Modifier.testTag("close_budget_sheet")) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
@@ -197,10 +223,148 @@ fun BudgetHistorySheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Monthly Budget Card
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.AccountBalanceWallet,
+                                contentDescription = null,
+                                tint = BrandBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "MONTHLY BUDGET",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = BrandBlue,
+                                letterSpacing = 0.6.sp
+                            )
+                        }
+
+                        if (!isEditingBudget) {
+                            TextButton(
+                                onClick = { isEditingBudget = true },
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Text(
+                                    text = if (monthlyBudgetEur != null) "Edit" else "Set Budget",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    if (isEditingBudget) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = budgetInput,
+                                onValueChange = { budgetInput = it },
+                                placeholder = { Text("e.g. 70.00") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Decimal,
+                                    imeAction = ImeAction.Done
+                                ),
+                                keyboardActions = KeyboardActions(onDone = {
+                                    focusManager.clearFocus()
+                                    val parsed = budgetInput.toDoubleOrNull()
+                                    onSaveMonthlyBudget(parsed)
+                                    isEditingBudget = false
+                                }),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                                    focusedBorderColor = BrandBlue
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f).height(50.dp)
+                            )
+
+                            Button(
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    val parsed = budgetInput.toDoubleOrNull()
+                                    onSaveMonthlyBudget(parsed)
+                                    isEditingBudget = false
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = BrandBlue),
+                                modifier = Modifier.height(50.dp)
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = "Save", modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Save", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else if (monthlyBudgetEur != null && monthlyBudgetEur > 0) {
+                        val remaining = (monthlyBudgetEur - totalSpent).coerceAtLeast(0.0)
+                        val progress = (totalSpent / monthlyBudgetEur).toFloat().coerceIn(0f, 1f)
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = if (progress > 0.9f) MaterialTheme.colorScheme.error else BrandBlue,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            strokeCap = StrokeCap.Round
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = String.format(Locale.ROOT, "€%.2f remaining", remaining),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (remaining <= 5.0) MaterialTheme.colorScheme.error else Color(0xFF059669)
+                            )
+                            Text(
+                                text = String.format(Locale.ROOT, "Budget €%.2f", monthlyBudgetEur),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Set an optional monthly budget to keep your student meal spending on track.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
 
             Text(
-                text = "RECENT MEAL HISTORY",
+                text = "LUNCH HISTORY",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -246,7 +410,7 @@ fun BudgetHistorySheet(
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.surface,
                             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().testTag("history_item_${record.id}")
                         ) {
                             Row(
                                 modifier = Modifier
@@ -281,7 +445,7 @@ fun BudgetHistorySheet(
 
                                     IconButton(
                                         onClick = { onDeleteRecord(record.id) },
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(28.dp).testTag("delete_history_${record.id}")
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.DeleteOutline,

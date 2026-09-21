@@ -57,11 +57,11 @@ fun DietaryFilterChips(
         DietaryFilter.values().forEach { filter ->
             val isSelected = filter == selectedFilter
 
-            val (icon: ImageVector, title: String) = when (filter) {
-                DietaryFilter.ALL -> Pair(Icons.Default.RestaurantMenu, "All")
-                DietaryFilter.VEG -> Pair(Icons.Default.Spa, "Veg (Vegan)")
-                DietaryFilter.GLUTEN_FREE -> Pair(Icons.Default.Grass, "G (Gluten-free)")
-                DietaryFilter.MILK_FREE -> Pair(Icons.Default.Opacity, "M (Milk-free)")
+            val (icon: ImageVector, title: String, fullDesc: String) = when (filter) {
+                DietaryFilter.ALL -> Triple(Icons.Default.RestaurantMenu, "All", "All items")
+                DietaryFilter.VEG -> Triple(Icons.Default.Spa, "Veg", "Vegetarian and Vegan")
+                DietaryFilter.GLUTEN_FREE -> Triple(Icons.Default.Grass, "G", "Gluten-free")
+                DietaryFilter.MILK_FREE -> Triple(Icons.Default.Opacity, "M", "Milk-free / Lactose-free")
             }
 
             val bgColor by animateColorAsState(
@@ -81,15 +81,15 @@ fun DietaryFilterChips(
                 border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
                 shadowElevation = if (isSelected) 3.dp else 0.dp,
                 modifier = Modifier
-                    .height(44.dp)
+                    .height(42.dp)
                     .testTag("filter_chip_${filter.name.lowercase()}")
                     .semantics {
-                        contentDescription = "Filter by $title. ${if (isSelected) "Selected" else "Not selected"}"
+                        contentDescription = "Filter by $fullDesc. ${if (isSelected) "Selected" else "Not selected"}"
                     }
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Icon(
                         imageVector = icon,
@@ -102,7 +102,7 @@ fun DietaryFilterChips(
                         text = title,
                         color = contentColor,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        fontSize = 13.sp
+                        fontSize = 14.sp
                     )
                 }
             }

@@ -334,6 +334,19 @@ fun FoodDetailSheet(
             val nutrition = meal.nutritionInfo
             if (nutrition != null && nutrition.hasMacros) {
                 MacroNutritionGrid(nutrition = nutrition, isDark = isDark)
+            } else if (!meal.nutrition.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = meal.nutrition,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(14.dp)
+                    )
+                }
             } else {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -836,13 +849,20 @@ fun getMealTypeIcon(mealType: MealType): ImageVector {
 }
 
 private fun shareMeal(context: Context, meal: Meal, restaurantName: String) {
-    val sendIntent = Intent().apply {
-        action = Intent.ACTION_SEND
-        putExtra(
-            Intent.EXTRA_TEXT,
-            "Today at UniCafe $restaurantName: ${meal.name} (${meal.dietaryBadges.joinToString()}) for ${meal.studentPrice ?: "student lunch"}! Check it on UniCafe Daily."
-        )
-        type = "text/plain"
+    try {
+        val sendIntent = Intent().apply {
+            action = Intent.ACTION_SEND
+            putExtra(
+                Intent.EXTRA_TEXT,
+                "Today at UniCafe $restaurantName: ${meal.name} (${meal.dietaryBadges.joinToString()}) for ${meal.studentPrice ?: "student lunch"}! Check it on UniCafe Daily."
+            )
+            type = "text/plain"
+        }
+        val chooser = Intent.createChooser(sendIntent, "Share lunch with friends").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
+    } catch (e: Exception) {
+        android.util.Log.e("FoodDetailSheet", "Failed to share meal", e)
     }
-    context.startActivity(Intent.createChooser(sendIntent, "Share lunch with friends"))
 }

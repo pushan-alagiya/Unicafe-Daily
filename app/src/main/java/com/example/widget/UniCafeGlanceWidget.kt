@@ -36,6 +36,7 @@ import com.example.MainActivity
 import com.example.data.repository.UniCafeRepository
 import com.example.domain.model.Meal
 import com.example.domain.model.Restaurant
+import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -52,9 +53,21 @@ class UniCafeGlanceWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repository = UniCafeRepository.getInstance(context)
-        val cachedRestaurants = repository.getCachedRestaurants() ?: emptyList()
-        val favorites = cachedRestaurants.filter { it.isFavorite }
-            .ifEmpty { cachedRestaurants.take(3) }
+        var cachedRestaurants = repository.getCachedRestaurants() ?: emptyList()
+        if (cachedRestaurants.isEmpty()) {
+            val result = repository.fetchRestaurants(forceNetwork = false)
+            if (result is com.example.data.repository.MenuFetchResult.Success) {
+                cachedRestaurants = result.restaurants
+            } else if (result is com.example.data.repository.MenuFetchResult.Error && result.cachedRestaurants != null) {
+                cachedRestaurants = result.cachedRestaurants
+            }
+        }
+        val orderedFavoriteIds = repository.orderedFavoriteIdsFlow.first()
+        val favorites = if (orderedFavoriteIds.isNotEmpty()) {
+            orderedFavoriteIds.mapNotNull { favId -> cachedRestaurants.firstOrNull { it.id == favId } }
+        } else {
+            cachedRestaurants.filter { it.isFavorite }
+        }.ifEmpty { cachedRestaurants.take(3) }
 
         val timeFormat = SimpleDateFormat("HH:mm", Locale.ROOT)
         val lastUpdatedStr = timeFormat.format(Date())

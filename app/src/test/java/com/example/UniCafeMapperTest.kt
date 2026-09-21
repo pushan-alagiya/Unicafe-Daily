@@ -69,8 +69,9 @@ class UniCafeMapperTest {
             )
         )
 
-        // Monday at 12:00 -> OPEN
         val mondayDate = LocalDate.of(2026, 9, 21) // Monday
+
+        // Monday at 12:00 -> OPEN
         val openStatus = UniCafeMapper.calculateStatus(
             visitingHours = testHours,
             targetDate = mondayDate,
@@ -78,15 +79,27 @@ class UniCafeMapperTest {
         )
         assertTrue(openStatus.isOpenNow)
         assertEquals("OPEN", openStatus.shortStatus)
+        assertEquals(com.example.domain.model.StatusState.OPEN, openStatus.state)
 
-        // Monday at 10:30 (before lunch) -> CLOSED
-        val beforeStatus = UniCafeMapper.calculateStatus(
+        // Monday at 10:30 (30 min before lunch) -> OPENING SOON
+        val openingSoonStatus = UniCafeMapper.calculateStatus(
             visitingHours = testHours,
             targetDate = mondayDate,
             targetTime = LocalTime.of(10, 30)
         )
-        assertFalse(beforeStatus.isOpenNow)
-        assertEquals("CLOSED", beforeStatus.shortStatus)
+        assertFalse(openingSoonStatus.isOpenNow)
+        assertEquals("OPENING SOON", openingSoonStatus.shortStatus)
+        assertEquals(com.example.domain.model.StatusState.OPENING_SOON, openingSoonStatus.state)
+
+        // Monday at 08:00 (more than 1 hour before lunch) -> CLOSED
+        val earlyStatus = UniCafeMapper.calculateStatus(
+            visitingHours = testHours,
+            targetDate = mondayDate,
+            targetTime = LocalTime.of(8, 0)
+        )
+        assertFalse(earlyStatus.isOpenNow)
+        assertEquals("CLOSED", earlyStatus.shortStatus)
+        assertEquals(com.example.domain.model.StatusState.CLOSED, earlyStatus.state)
 
         // Monday at 14:30 (after lunch) -> CLOSED
         val afterStatus = UniCafeMapper.calculateStatus(
@@ -96,6 +109,7 @@ class UniCafeMapperTest {
         )
         assertFalse(afterStatus.isOpenNow)
         assertEquals("CLOSED", afterStatus.shortStatus)
+        assertEquals(com.example.domain.model.StatusState.CLOSED, afterStatus.state)
 
         // Sunday (weekend closed) -> CLOSED
         val sundayDate = LocalDate.of(2026, 9, 27) // Sunday
@@ -106,6 +120,7 @@ class UniCafeMapperTest {
         )
         assertFalse(weekendStatus.isOpenNow)
         assertEquals("CLOSED", weekendStatus.shortStatus)
+        assertEquals(com.example.domain.model.StatusState.CLOSED, weekendStatus.state)
         assertEquals("Closed today", weekendStatus.hoursDescription)
     }
 

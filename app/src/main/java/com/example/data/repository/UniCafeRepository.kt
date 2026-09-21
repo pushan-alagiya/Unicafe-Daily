@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.example.data.api.UniCafeApiClient
 import com.example.data.dto.RestaurantDto
+import com.example.data.mapper.RestaurantCanonicalMapper
 import com.example.data.mapper.UniCafeMapper
 import com.example.data.preferences.UserPreferencesRepository
 import com.example.domain.model.DietaryFilter
@@ -47,6 +48,9 @@ class UniCafeRepository(
     private val jsonAdapter = UniCafeApiClient.moshi.adapter<List<RestaurantDto>>(restaurantListType)
 
     val favoriteIdsFlow: Flow<Set<Int>> = preferencesRepository.favoriteRestaurantIdsFlow
+    val orderedFavoriteIdsFlow: Flow<List<Int>> = preferencesRepository.orderedFavoriteRestaurantIdsFlow
+    val appLanguageFlow: Flow<String> = preferencesRepository.appLanguageFlow
+    val statusFilterFlow: Flow<String> = preferencesRepository.statusFilterFlow
     val dietaryFilterFlow: Flow<DietaryFilter> = preferencesRepository.dietaryFilterFlow
     val lastRefreshedFlow: Flow<Long?> = preferencesRepository.lastRefreshedTimestampFlow
     val favoriteMealNamesFlow: Flow<Set<String>> = preferencesRepository.favoriteMealNamesFlow
@@ -55,15 +59,63 @@ class UniCafeRepository(
     val campusPreferenceFlow = preferencesRepository.campusPreferenceFlow
     val eatenMealsFlow = preferencesRepository.eatenMealsFlow
     val notificationsEnabledFlow = preferencesRepository.notificationsEnabledFlow
+    val monthlyBudgetEurFlow = preferencesRepository.monthlyBudgetEurFlow
+    val recentlyViewedFlow = preferencesRepository.recentlyViewedFlow
 
-    suspend fun fetchRestaurants(forceNetwork: Boolean = false): MenuFetchResult = withContext(Dispatchers.IO) {
+    suspend fun fetchRestaurantsForDate(
+        targetDate: LocalDate,
+        forceNetwork: Boolean = false,
+        language: String? = null
+    ): List<Restaurant> = withContext(Dispatchers.IO) {
         val favoriteIds = preferencesRepository.favoriteRestaurantIdsFlow.first()
+        val currentLang = language ?: preferencesRepository.appLanguageFlow.first()
         val cachedJson = preferencesRepository.cachedJsonFlow.first()
+        val cachedLang = preferencesRepository.cachedJsonLangFlow.first()
+
+        val isCacheValidForLang = !cachedJson.isNullOrBlank() && (cachedLang == currentLang || cachedLang == null)
+
+        val dtos = try {
+            if (forceNetwork || !isCacheValidForLang) {
+                val networkDtos = UniCafeApiClient.api.getRestaurants(language = currentLang)
+                val now = System.currentTimeMillis()
+                preferencesRepository.saveCachedJson(jsonAdapter.toJson(networkDtos), currentLang, now)
+                networkDtos
+            } else {
+                jsonAdapter.fromJson(cachedJson!!) ?: UniCafeApiClient.api.getRestaurants(language = currentLang)
+            }
+        } catch (e: Exception) {
+            if (!cachedJson.isNullOrBlank()) {
+                jsonAdapter.fromJson(cachedJson) ?: emptyList()
+            } else {
+                emptyList()
+            }
+        }
+
+        dtos.map { dto ->
+            UniCafeMapper.mapToRestaurant(
+                dto = dto,
+                favoriteIds = favoriteIds,
+                targetDate = targetDate,
+                targetTime = LocalTime.now(UniCafeMapper.HELSINKI_ZONE)
+            )
+        }
+    }
+
+    suspend fun fetchRestaurants(
+        forceNetwork: Boolean = false,
+        language: String? = null
+    ): MenuFetchResult = withContext(Dispatchers.IO) {
+        val favoriteIds = preferencesRepository.favoriteRestaurantIdsFlow.first()
+        val currentLang = language ?: preferencesRepository.appLanguageFlow.first()
+        val cachedJson = preferencesRepository.cachedJsonFlow.first()
+        val cachedLang = preferencesRepository.cachedJsonLangFlow.first()
         val lastUpdated = preferencesRepository.lastRefreshedTimestampFlow.first()
 
+        val isCacheValidForLang = !cachedJson.isNullOrBlank() && (cachedLang == currentLang || cachedLang == null)
+
         try {
-            // Attempt network fetch
-            val responseDtos = UniCafeApiClient.api.getRestaurants()
+            // Attempt network fetch with selected language
+            val responseDtos = UniCafeApiClient.api.getRestaurants(language = currentLang)
             val now = System.currentTimeMillis()
 
             val domainModels = responseDtos.map { dto ->
@@ -72,15 +124,16 @@ class UniCafeRepository(
 
             // Menu change detection
             var changeNotice: String? = null
-            if (!cachedJson.isNullOrBlank()) {
+            if (isCacheValidForLang && !cachedJson.isNullOrBlank()) {
                 try {
                     val prevDtos = jsonAdapter.fromJson(cachedJson) ?: emptyList()
-                    val prevFavModels = prevDtos.filter { favoriteIds.contains(it.id) }
+                    val canonicalFavIds = favoriteIds.map { RestaurantCanonicalMapper.getCanonicalId(it) }.toSet()
+                    val prevFavModels = prevDtos.filter { canonicalFavIds.contains(RestaurantCanonicalMapper.getCanonicalId(it.id, it.slug)) }
                         .map { UniCafeMapper.mapToRestaurant(it, favoriteIds) }
-                    val newFavModels = domainModels.filter { favoriteIds.contains(it.id) }
+                    val newFavModels = domainModels.filter { it.isFavorite }
 
                     for (newR in newFavModels) {
-                        val prevR = prevFavModels.firstOrNull { it.id == newR.id }
+                        val prevR = prevFavModels.firstOrNull { RestaurantCanonicalMapper.isSameRestaurant(it.id, newR.id, it.slug, newR.slug) }
                         if (prevR != null) {
                             val prevMealNames = prevR.todaysMeals.map { it.name.trim().lowercase() }.toSet()
                             val newAdded = newR.todaysMeals.firstOrNull { !prevMealNames.contains(it.name.trim().lowercase()) }
@@ -94,7 +147,7 @@ class UniCafeRepository(
             }
 
             val jsonString = jsonAdapter.toJson(responseDtos)
-            preferencesRepository.saveCachedJson(jsonString, now)
+            preferencesRepository.saveCachedJson(jsonString, currentLang, now)
 
             MenuFetchResult.Success(
                 restaurants = domainModels,
@@ -103,7 +156,7 @@ class UniCafeRepository(
                 menuChangeNotice = changeNotice
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Network request failed: ${e.message}", e)
+            Log.e(TAG, "Network request failed for lang $currentLang: ${e.message}", e)
 
             // Try fallback to local cache
             if (!cachedJson.isNullOrBlank()) {
@@ -160,6 +213,18 @@ class UniCafeRepository(
         preferencesRepository.saveFavorites(ids)
     }
 
+    suspend fun setOrderedFavorites(orderedIds: List<Int>) {
+        preferencesRepository.saveOrderedFavorites(orderedIds)
+    }
+
+    suspend fun setAppLanguage(lang: String) {
+        preferencesRepository.saveAppLanguage(lang)
+    }
+
+    suspend fun setStatusFilter(filter: String) {
+        preferencesRepository.saveStatusFilter(filter)
+    }
+
     suspend fun setDietaryFilter(filter: DietaryFilter) {
         preferencesRepository.saveDietaryFilter(filter)
     }
@@ -190,5 +255,17 @@ class UniCafeRepository(
 
     suspend fun setNotificationsEnabled(enabled: Boolean) {
         preferencesRepository.setNotificationsEnabled(enabled)
+    }
+
+    suspend fun saveMonthlyBudget(budget: Double?) {
+        preferencesRepository.saveMonthlyBudget(budget)
+    }
+
+    suspend fun recordRecentlyViewed(dish: com.example.domain.model.RecentlyViewedDish) {
+        preferencesRepository.recordRecentlyViewed(dish)
+    }
+
+    suspend fun clearRecentlyViewed() {
+        preferencesRepository.clearRecentlyViewed()
     }
 }

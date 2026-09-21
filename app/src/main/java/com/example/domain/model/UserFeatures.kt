@@ -12,6 +12,16 @@ data class EatenMealRecord(
     val dietaryBadges: List<String> = emptyList()
 )
 
+data class RecentlyViewedDish(
+    val id: String = UUID.randomUUID().toString(),
+    val mealName: String,
+    val restaurantName: String,
+    val category: String = "",
+    val studentPrice: String? = null,
+    val dietaryBadges: List<String> = emptyList(),
+    val timestamp: Long = System.currentTimeMillis()
+)
+
 enum class MyDietPreference(val displayName: String, val badgeKey: String?) {
     NONE("None / All", null),
     VEGAN("Vegan (Kasvis)", "Veg"),
