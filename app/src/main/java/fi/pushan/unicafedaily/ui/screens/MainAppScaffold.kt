@@ -58,14 +58,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fi.pushan.unicafedaily.R
+import fi.pushan.unicafedaily.data.mapper.RestaurantCanonicalMapper
 import fi.pushan.unicafedaily.domain.model.Meal
 import fi.pushan.unicafedaily.ui.components.BudgetHistorySheet
 import fi.pushan.unicafedaily.ui.components.DietaryLegendSheet
+import fi.pushan.unicafedaily.ui.components.FavoriteDishesSheet
 import fi.pushan.unicafedaily.ui.components.FavoritePickerSheet
 import fi.pushan.unicafedaily.ui.components.FilterBottomSheet
 import fi.pushan.unicafedaily.ui.components.FoodDetailSheet
 import fi.pushan.unicafedaily.ui.components.LeavingForLunchSheet
+import fi.pushan.unicafedaily.ui.components.RestaurantDetailSheet
 import fi.pushan.unicafedaily.ui.components.SurpriseMeSheet
+import fi.pushan.unicafedaily.ui.components.UniCafeInfoSheet
 import fi.pushan.unicafedaily.ui.state.AppTab
 import fi.pushan.unicafedaily.ui.state.HomeUiState
 import fi.pushan.unicafedaily.ui.theme.BrandBlue
@@ -125,6 +129,10 @@ fun MainAppScaffold(
                             selectedMealForDetail = meal to restName
                         },
                         onDismissMenuNotice = viewModel::onDismissMenuNotice,
+                        onOpenUniCafeInfo = viewModel::onOpenUniCafeInfo,
+                        onOpenFavoriteDishes = viewModel::onOpenFavoriteDishes,
+                        onSetCustomerCategory = viewModel::onSetCustomerCategory,
+                        onSelectRestaurantForDetail = viewModel::onSelectRestaurantForDetail,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -218,6 +226,47 @@ fun MainAppScaffold(
         )
     }
 
+    if (uiState.showUniCafeInfoSheet) {
+        UniCafeInfoSheet(
+            selectedCategory = uiState.customerCategory,
+            onCategorySelected = viewModel::onSetCustomerCategory,
+            onDismiss = viewModel::onDismissUniCafeInfo
+        )
+    }
+
+    if (uiState.showFavoriteDishesSheet) {
+        FavoriteDishesSheet(
+            favoriteMealNames = uiState.favoriteMealNames,
+            allRestaurants = uiState.allRestaurants,
+            customerCategory = uiState.customerCategory,
+            onToggleFavoriteMeal = viewModel::onToggleFavoriteMeal,
+            onMealClick = { meal, rest ->
+                viewModel.onViewMeal(meal, rest.name)
+                selectedMealForDetail = meal to rest.name
+            },
+            onDismiss = viewModel::onDismissFavoriteDishes
+        )
+    }
+
+    uiState.selectedRestaurantForDetail?.let { restaurant ->
+        val isFav = uiState.favoriteIds.any {
+            RestaurantCanonicalMapper.getCanonicalId(it) == RestaurantCanonicalMapper.getCanonicalId(restaurant.id, restaurant.slug)
+        }
+        RestaurantDetailSheet(
+            restaurant = restaurant,
+            isFavorite = isFav,
+            customerCategory = uiState.customerCategory,
+            favoriteMealNames = uiState.favoriteMealNames,
+            onToggleFavoriteRestaurant = viewModel::onToggleFavoriteRestaurant,
+            onToggleFavoriteMeal = viewModel::onToggleFavoriteMeal,
+            onMealClick = { meal ->
+                viewModel.onViewMeal(meal, restaurant.name)
+                selectedMealForDetail = meal to restaurant.name
+            },
+            onDismiss = { viewModel.onSelectRestaurantForDetail(null) }
+        )
+    }
+
     selectedMealForDetail?.let { (meal, restaurantName) ->
         FoodDetailSheet(
             meal = meal,
@@ -232,6 +281,7 @@ fun MainAppScaffold(
                     badges = meal.dietaryBadges
                 )
             },
+            customerCategory = uiState.customerCategory,
             onDismiss = { selectedMealForDetail = null }
         )
     }

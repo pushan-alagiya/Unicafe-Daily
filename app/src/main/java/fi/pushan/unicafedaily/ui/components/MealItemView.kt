@@ -82,9 +82,11 @@ fun MealItemView(
     isFavoriteMeal: Boolean = false,
     onToggleFavorite: (() -> Unit)? = null,
     isRecentlyEaten: Boolean = false,
+    customerCategory: fi.pushan.unicafedaily.domain.model.CustomerCategory = fi.pushan.unicafedaily.domain.model.CustomerCategory.STUDENT,
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
+    val displayPrice = meal.priceForCategory(customerCategory) ?: meal.studentPrice ?: "€3.10"
 
     Surface(
         onClick = { onMealClick(meal) },
@@ -94,7 +96,7 @@ fun MealItemView(
             .fillMaxWidth()
             .testTag("meal_item_${meal.id}")
             .semantics {
-                contentDescription = "${meal.category}: ${meal.name}. Student price ${meal.studentPrice ?: "3.10"}"
+                contentDescription = "${meal.category}: ${meal.name}. Price $displayPrice"
             }
     ) {
         Column(
@@ -158,20 +160,18 @@ fun MealItemView(
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            meal.studentPrice?.let { price ->
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    modifier = Modifier.padding(end = 4.dp)
-                                ) {
-                                    Text(
-                                        text = price,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                    )
-                                }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.padding(end = 4.dp)
+                            ) {
+                                Text(
+                                    text = displayPrice,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                )
                             }
 
                             if (onToggleFavorite != null) {

@@ -33,9 +33,12 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import fi.pushan.unicafedaily.MainActivity
+import fi.pushan.unicafedaily.data.mapper.RestaurantCanonicalMapper
+import fi.pushan.unicafedaily.data.repository.MenuFetchResult
 import fi.pushan.unicafedaily.data.repository.UniCafeRepository
 import fi.pushan.unicafedaily.domain.model.Meal
 import fi.pushan.unicafedaily.domain.model.Restaurant
+import fi.pushan.unicafedaily.domain.model.StatusState
 import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -53,30 +56,52 @@ class UniCafeGlanceWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repository = UniCafeRepository.getInstance(context)
-        var cachedRestaurants = repository.getCachedRestaurants() ?: emptyList()
-        if (cachedRestaurants.isEmpty()) {
-            val result = repository.fetchRestaurants(forceNetwork = false)
-            if (result is fi.pushan.unicafedaily.data.repository.MenuFetchResult.Success) {
-                cachedRestaurants = result.restaurants
-            } else if (result is fi.pushan.unicafedaily.data.repository.MenuFetchResult.Error && result.cachedRestaurants != null) {
-                cachedRestaurants = result.cachedRestaurants
+        val currentLang = repository.appLanguageFlow.first()
+
+        // Fetch or get cache strictly for the current app language
+        var restaurants = repository.getCachedRestaurants(currentLang) ?: emptyList()
+        if (restaurants.isEmpty()) {
+            val result = repository.fetchRestaurants(forceNetwork = true, language = currentLang)
+            if (result is MenuFetchResult.Success) {
+                restaurants = result.restaurants
+            } else if (result is MenuFetchResult.Error && result.cachedRestaurants != null) {
+                restaurants = result.cachedRestaurants
             }
         }
-        val orderedFavoriteIds = repository.orderedFavoriteIdsFlow.first()
-        val favorites = if (orderedFavoriteIds.isNotEmpty()) {
-            orderedFavoriteIds.mapNotNull { favId -> cachedRestaurants.firstOrNull { it.id == favId } }
-        } else {
-            cachedRestaurants.filter { it.isFavorite }
-        }.ifEmpty { cachedRestaurants.take(3) }
 
-        val timeFormat = SimpleDateFormat("HH:mm", Locale.ROOT)
+        val orderedFavoriteIds = repository.orderedFavoriteIdsFlow.first()
+        val favoriteMealNames = repository.favoriteMealNamesFlow.first()
+        val customerCategory = repository.customerCategoryFlow.first()
+
+        // Strictly show ONLY favorites matching canonical IDs. Never fall back to all list.
+        val favorites = if (orderedFavoriteIds.isNotEmpty()) {
+            val canonicalFavIds = orderedFavoriteIds.map { RestaurantCanonicalMapper.getCanonicalId(it) }
+            canonicalFavIds.mapNotNull { canonicalId ->
+                restaurants.firstOrNull { rest ->
+                    RestaurantCanonicalMapper.getCanonicalId(rest.id, rest.slug) == canonicalId
+                }?.copy(isFavorite = true)
+            }
+        } else {
+            emptyList()
+        }
+
+        val timeLocale = when (currentLang) {
+            "fi" -> Locale("fi", "FI")
+            "sv" -> Locale("sv", "SE")
+            else -> Locale.ENGLISH
+        }
+        val timeFormat = SimpleDateFormat("HH:mm", timeLocale)
         val lastUpdatedStr = timeFormat.format(Date())
+        val strings = getWidgetStrings(currentLang)
 
         provideContent {
             GlanceTheme {
                 WidgetContent(
                     favorites = favorites,
-                    lastUpdated = lastUpdatedStr
+                    favoriteMealNames = favoriteMealNames,
+                    customerCategory = customerCategory,
+                    lastUpdated = lastUpdatedStr,
+                    strings = strings
                 )
             }
         }
@@ -85,7 +110,10 @@ class UniCafeGlanceWidget : GlanceAppWidget() {
     @Composable
     private fun WidgetContent(
         favorites: List<Restaurant>,
-        lastUpdated: String
+        favoriteMealNames: Set<String>,
+        customerCategory: fi.pushan.unicafedaily.domain.model.CustomerCategory,
+        lastUpdated: String,
+        strings: WidgetStrings
     ) {
         val widgetBg = createColorProvider(
             day = androidx.compose.ui.graphics.Color(0xFFF8FAFC),
@@ -128,8 +156,14 @@ class UniCafeGlanceWidget : GlanceAppWidget() {
 
                 Spacer(modifier = GlanceModifier.defaultWeight())
 
+                val subHeader = if (favorites.isNotEmpty()) {
+                    "${strings.favoritesCount(favorites.size)} • $lastUpdated"
+                } else {
+                    "• $lastUpdated"
+                }
+
                 Text(
-                    text = "• $lastUpdated",
+                    text = subHeader,
                     style = TextStyle(
                         color = secondaryText,
                         fontSize = 11.sp
@@ -144,16 +178,36 @@ class UniCafeGlanceWidget : GlanceAppWidget() {
                     modifier = GlanceModifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "Tap to choose favorite UniCafes",
-                        style = TextStyle(color = secondaryText, fontSize = 12.sp)
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = GlanceModifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = strings.noFavoritesTitle,
+                            style = TextStyle(
+                                color = primaryText,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        )
+                        Spacer(modifier = GlanceModifier.height(4.dp))
+                        Text(
+                            text = strings.noFavoritesSub,
+                            style = TextStyle(
+                                color = secondaryText,
+                                fontSize = 11.sp
+                            )
+                        )
+                    }
                 }
             } else {
                 LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                     items(favorites) { restaurant ->
                         RestaurantCardWidget(
                             restaurant = restaurant,
+                            favoriteMealNames = favoriteMealNames,
+                            customerCategory = customerCategory,
+                            strings = strings,
                             primaryText = primaryText,
                             secondaryText = secondaryText
                         )
@@ -167,6 +221,9 @@ class UniCafeGlanceWidget : GlanceAppWidget() {
     @Composable
     private fun RestaurantCardWidget(
         restaurant: Restaurant,
+        favoriteMealNames: Set<String>,
+        customerCategory: fi.pushan.unicafedaily.domain.model.CustomerCategory,
+        strings: WidgetStrings,
         primaryText: ColorProvider,
         secondaryText: ColorProvider
     ) {
@@ -215,25 +272,32 @@ class UniCafeGlanceWidget : GlanceAppWidget() {
                     )
                 )
 
-                Spacer(modifier = GlanceModifier.width(6.dp))
-
-                Text(
-                    text = "• ${restaurant.campus}",
-                    style = TextStyle(
-                        color = secondaryText,
-                        fontSize = 11.sp
+                if (restaurant.campus.isNotBlank()) {
+                    Spacer(modifier = GlanceModifier.width(6.dp))
+                    Text(
+                        text = "• ${restaurant.campus}",
+                        style = TextStyle(
+                            color = secondaryText,
+                            fontSize = 11.sp
+                        )
                     )
-                )
+                }
 
                 Spacer(modifier = GlanceModifier.defaultWeight())
 
-                // Status Pill with countdown support
+                // Status Pill with localized text & countdown support
                 val countdown = restaurant.status.countdownText
                 val statusText = when {
-                    restaurant.status.isOpenNow && !countdown.isNullOrBlank() -> "● $countdown"
-                    restaurant.status.isOpenNow -> "● OPEN"
-                    !countdown.isNullOrBlank() -> "● $countdown"
-                    else -> "● CLOSED"
+                    restaurant.status.isOpenNow && !countdown.isNullOrBlank() -> {
+                        "● " + strings.formatCountdown(countdown)
+                    }
+                    restaurant.status.isOpenNow -> "● ${strings.openNow}"
+                    restaurant.status.state == StatusState.OPENING_SOON && !countdown.isNullOrBlank() -> {
+                        "● " + strings.formatCountdown(countdown)
+                    }
+                    restaurant.status.state == StatusState.OPENING_SOON -> "● ${strings.openingSoon}"
+                    countdown?.contains("Closed today", ignoreCase = true) == true -> "● ${strings.closedToday}"
+                    else -> "● ${strings.closed}"
                 }
 
                 Box(
@@ -253,18 +317,40 @@ class UniCafeGlanceWidget : GlanceAppWidget() {
                 }
             }
 
-            // Hours
-            Text(
-                text = restaurant.status.hoursDescription,
-                style = TextStyle(color = secondaryText, fontSize = 11.sp)
-            )
+            // Localized Lunch Hours
+            val localizedHours = strings.formatHours(restaurant.status.hoursDescription)
+            if (localizedHours.isNotBlank()) {
+                Spacer(modifier = GlanceModifier.height(2.dp))
+                Text(
+                    text = localizedHours,
+                    style = TextStyle(color = secondaryText, fontSize = 11.sp)
+                )
+            }
 
-            // Meals (Show up to 2 items)
-            val previewMeals = restaurant.todaysMeals.take(2)
-            if (previewMeals.isNotEmpty()) {
+            // Meals (Show all favorites-related meals, prioritizing user's favorite dishes)
+            if (restaurant.todaysMeals.isEmpty()) {
                 Spacer(modifier = GlanceModifier.height(4.dp))
-                for (meal in previewMeals) {
-                    MealRowWidget(meal = meal, primaryText = primaryText, secondaryText = secondaryText)
+                Text(
+                    text = strings.noMenuToday,
+                    style = TextStyle(color = secondaryText, fontSize = 11.sp)
+                )
+            } else {
+                // Prioritize favorite dishes at top
+                val (favMeals, regularMeals) = restaurant.todaysMeals.partition { meal ->
+                    favoriteMealNames.any { fav -> fav.equals(meal.name, ignoreCase = true) }
+                }
+                val sortedMeals = favMeals + regularMeals
+
+                Spacer(modifier = GlanceModifier.height(4.dp))
+                for (meal in sortedMeals) {
+                    val isFavMeal = favoriteMealNames.any { fav -> fav.equals(meal.name, ignoreCase = true) }
+                    MealRowWidget(
+                        meal = meal,
+                        isFavoriteMeal = isFavMeal,
+                        customerCategory = customerCategory,
+                        primaryText = primaryText,
+                        secondaryText = secondaryText
+                    )
                 }
             }
         }
@@ -273,12 +359,18 @@ class UniCafeGlanceWidget : GlanceAppWidget() {
     @Composable
     private fun MealRowWidget(
         meal: Meal,
+        isFavoriteMeal: Boolean,
+        customerCategory: fi.pushan.unicafedaily.domain.model.CustomerCategory,
         primaryText: ColorProvider,
         secondaryText: ColorProvider
     ) {
         val studentPriceColor = createColorProvider(
             day = androidx.compose.ui.graphics.Color(0xFF1E40AF),
             night = androidx.compose.ui.graphics.Color(0xFF93C5FD)
+        )
+        val favStarColor = createColorProvider(
+            day = androidx.compose.ui.graphics.Color(0xFFD97706),
+            night = androidx.compose.ui.graphics.Color(0xFFFBBF24)
         )
 
         Row(
@@ -287,18 +379,24 @@ class UniCafeGlanceWidget : GlanceAppWidget() {
                 .padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val favPrefix = if (isFavoriteMeal) "⭐ " else "• "
             val badgeStr = if (meal.dietaryBadges.isNotEmpty()) {
                 "[${meal.dietaryBadges.take(2).joinToString(" ")}] "
             } else ""
 
             Text(
-                text = "• $badgeStr${meal.name}",
+                text = "$favPrefix$badgeStr${meal.name}",
                 maxLines = 1,
-                style = TextStyle(color = primaryText, fontSize = 11.sp),
+                style = TextStyle(
+                    color = if (isFavoriteMeal) favStarColor else primaryText,
+                    fontWeight = if (isFavoriteMeal) FontWeight.Bold else FontWeight.Normal,
+                    fontSize = 11.sp
+                ),
                 modifier = GlanceModifier.defaultWeight()
             )
 
-            meal.studentPrice?.let { price ->
+            val displayPrice = meal.priceForCategory(customerCategory) ?: meal.studentPrice
+            displayPrice?.let { price ->
                 Spacer(modifier = GlanceModifier.width(6.dp))
                 Text(
                     text = price,
@@ -310,5 +408,82 @@ class UniCafeGlanceWidget : GlanceAppWidget() {
                 )
             }
         }
+    }
+}
+
+data class WidgetStrings(
+    val favoritesCount: (Int) -> String,
+    val noFavoritesTitle: String,
+    val noFavoritesSub: String,
+    val openNow: String,
+    val openingSoon: String,
+    val closed: String,
+    val closedToday: String,
+    val noMenuToday: String,
+    val lunchLabel: String,
+    val formatCountdown: (String) -> String,
+    val formatHours: (String) -> String
+)
+
+private fun getWidgetStrings(lang: String): WidgetStrings {
+    return when (lang) {
+        "fi" -> WidgetStrings(
+            favoritesCount = { count -> "Suosikit ($count)" },
+            noFavoritesTitle = "Ei valittuja UniCafe-suosikkeja",
+            noFavoritesSub = "Valitse suosikit sovelluksesta napauttamalla",
+            openNow = "AVOINNA",
+            openingSoon = "AUKEAA PIAN",
+            closed = "SULJETTU",
+            closedToday = "Suljettu tänään",
+            noMenuToday = "Ei lounaslistaa tälle päivälle",
+            lunchLabel = "Lounas",
+            formatCountdown = { cd ->
+                cd.replace("left", "jäljellä")
+                    .replace("Opens at", "Aukeaa klo")
+                    .replace("in", "")
+                    .trim()
+            },
+            formatHours = { hours ->
+                hours.replace("Lunch", "Lounas")
+                    .replace("Closed today", "Suljettu tänään")
+                    .replace("Hours unavailable", "Aukioloajat ei saatavilla")
+                    .replace("No lunch service", "Ei lounaspalvelua")
+            }
+        )
+        "sv" -> WidgetStrings(
+            favoritesCount = { count -> "Favoriter ($count)" },
+            noFavoritesTitle = "Inga UniCafe-favoriter valda",
+            noFavoritesSub = "Välj favoriter i appen genom att trycka",
+            openNow = "ÖPPET",
+            openingSoon = "ÖPPNAR SNART",
+            closed = "STÄNGT",
+            closedToday = "Stängt idag",
+            noMenuToday = "Ingen matsedel för idag",
+            lunchLabel = "Lunch",
+            formatCountdown = { cd ->
+                cd.replace("left", "kvar")
+                    .replace("Opens at", "Öppnar kl.")
+                    .replace("in", "")
+                    .trim()
+            },
+            formatHours = { hours ->
+                hours.replace("Closed today", "Stängt idag")
+                    .replace("Hours unavailable", "Öppettider ej tillgängliga")
+                    .replace("No lunch service", "Ingen lunchservering")
+            }
+        )
+        else -> WidgetStrings(
+            favoritesCount = { count -> "Favorites ($count)" },
+            noFavoritesTitle = "No favorite UniCafes selected",
+            noFavoritesSub = "Tap to choose favorites in the app",
+            openNow = "OPEN",
+            openingSoon = "OPENING SOON",
+            closed = "CLOSED",
+            closedToday = "Closed today",
+            noMenuToday = "No menu available for today",
+            lunchLabel = "Lunch",
+            formatCountdown = { cd -> cd },
+            formatHours = { hours -> hours }
+        )
     }
 }

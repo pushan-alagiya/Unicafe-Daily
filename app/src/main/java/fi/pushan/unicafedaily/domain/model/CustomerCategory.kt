@@ -1,4 +1,4 @@
-package com.example.domain.model
+package fi.pushan.unicafedaily.domain.model
 
 enum class CustomerCategory(
     val id: String,

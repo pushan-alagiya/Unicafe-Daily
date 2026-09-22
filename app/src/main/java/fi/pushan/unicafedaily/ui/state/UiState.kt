@@ -1,6 +1,7 @@
 package fi.pushan.unicafedaily.ui.state
 
 import fi.pushan.unicafedaily.domain.model.Campus
+import fi.pushan.unicafedaily.domain.model.CustomerCategory
 import fi.pushan.unicafedaily.domain.model.DietaryFilter
 import fi.pushan.unicafedaily.domain.model.EatenMealRecord
 import fi.pushan.unicafedaily.domain.model.MyDietPreference
@@ -30,6 +31,10 @@ data class HomeUiState(
     val showFavoritePicker: Boolean = false,
     val showFilterSheet: Boolean = false,
     val showDietaryLegendSheet: Boolean = false,
+    val showFavoriteDishesSheet: Boolean = false,
+    val showUniCafeInfoSheet: Boolean = false,
+    val selectedRestaurantForDetail: Restaurant? = null,
+    val customerCategory: CustomerCategory = CustomerCategory.STUDENT,
     val statusFilter: String = "ALL",
     val appLanguage: String = "en",
     val selectedMenuDate: LocalDate = LocalDate.now(),

@@ -61,6 +61,7 @@ class UniCafeRepository(
     val notificationsEnabledFlow = preferencesRepository.notificationsEnabledFlow
     val monthlyBudgetEurFlow = preferencesRepository.monthlyBudgetEurFlow
     val recentlyViewedFlow = preferencesRepository.recentlyViewedFlow
+    val customerCategoryFlow: Flow<fi.pushan.unicafedaily.domain.model.CustomerCategory> = preferencesRepository.customerCategoryFlow
 
     suspend fun fetchRestaurantsForDate(
         targetDate: LocalDate,
@@ -190,7 +191,13 @@ class UniCafeRepository(
         }
     }
 
-    suspend fun getCachedRestaurants(): List<Restaurant>? = withContext(Dispatchers.IO) {
+    suspend fun getCachedRestaurants(language: String? = null): List<Restaurant>? = withContext(Dispatchers.IO) {
+        val currentLang = language ?: preferencesRepository.appLanguageFlow.first()
+        val cachedLang = preferencesRepository.cachedJsonLangFlow.first()
+        // If cache exists but is for a different language, return null so caller fetches in current language
+        if (cachedLang != null && cachedLang != currentLang) {
+            return@withContext null
+        }
         val cachedJson = preferencesRepository.cachedJsonFlow.first() ?: return@withContext null
         val favoriteIds = preferencesRepository.favoriteRestaurantIdsFlow.first()
         try {
@@ -267,5 +274,9 @@ class UniCafeRepository(
 
     suspend fun clearRecentlyViewed() {
         preferencesRepository.clearRecentlyViewed()
+    }
+
+    suspend fun setCustomerCategory(category: fi.pushan.unicafedaily.domain.model.CustomerCategory) {
+        preferencesRepository.setCustomerCategory(category)
     }
 }

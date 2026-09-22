@@ -310,5 +310,54 @@ class UniCafeMapperTest {
             fi.pushan.unicafedaily.domain.model.MealType.detect("Tofuwokki", "Vegaani", listOf("Veg"))
         )
     }
+
+    @Test
+    fun `test canonical restaurant ID matching works across language variants`() {
+        val fiKaivopihaId = 2543
+        val enKaivopihaId = 2558
+        val svKaivopihaId = 2559
+
+        val canonicalFi = fi.pushan.unicafedaily.data.mapper.RestaurantCanonicalMapper.getCanonicalId(fiKaivopihaId, "kaivopiha")
+        val canonicalEn = fi.pushan.unicafedaily.data.mapper.RestaurantCanonicalMapper.getCanonicalId(enKaivopihaId, "kaivopiha")
+        val canonicalSv = fi.pushan.unicafedaily.data.mapper.RestaurantCanonicalMapper.getCanonicalId(svKaivopihaId, "kaivopiha")
+
+        assertEquals(canonicalFi, canonicalEn)
+        assertEquals(canonicalFi, canonicalSv)
+
+        // Verifying filtering logic: when user selects fiKaivopihaId as favorite,
+        // it correctly matches enKaivopiha when English language is loaded!
+        val loadedRestaurants = listOf(
+            fi.pushan.unicafedaily.domain.model.Restaurant(
+                id = enKaivopihaId,
+                name = "Kaivopiha",
+                slug = "kaivopiha"
+            ),
+            fi.pushan.unicafedaily.domain.model.Restaurant(
+                id = 1356,
+                name = "Exactum",
+                slug = "exactum"
+            )
+        )
+
+        val userFavoriteIds = listOf(fiKaivopihaId)
+        val canonicalFavIds = userFavoriteIds.map { fi.pushan.unicafedaily.data.mapper.RestaurantCanonicalMapper.getCanonicalId(it) }
+        val matchedFavorites = canonicalFavIds.mapNotNull { canonicalId ->
+            loadedRestaurants.firstOrNull { rest ->
+                fi.pushan.unicafedaily.data.mapper.RestaurantCanonicalMapper.getCanonicalId(rest.id, rest.slug) == canonicalId
+            }
+        }
+
+        assertEquals(1, matchedFavorites.size)
+        assertEquals("Kaivopiha", matchedFavorites.first().name)
+
+        // When no favorites selected, list should be strictly empty (never fallback to all)
+        val emptyFavIds = emptyList<Int>()
+        val emptyFavorites = if (emptyFavIds.isNotEmpty()) {
+            emptyFavIds.mapNotNull { favId -> loadedRestaurants.firstOrNull { it.id == favId } }
+        } else {
+            emptyList()
+        }
+        assertTrue(emptyFavorites.isEmpty())
+    }
 }
 

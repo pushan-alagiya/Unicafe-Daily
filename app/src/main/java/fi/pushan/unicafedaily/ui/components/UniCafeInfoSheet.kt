@@ -1,4 +1,4 @@
-package com.example.ui.components
+package fi.pushan.unicafedaily.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -53,16 +53,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.domain.model.CustomerCategory
-import com.example.ui.theme.BadgeAllergenBg
-import com.example.ui.theme.BadgeAllergenText
-import com.example.ui.theme.BadgeGlutenFreeBg
-import com.example.ui.theme.BadgeGlutenFreeText
-import com.example.ui.theme.BadgeMilkFreeBg
-import com.example.ui.theme.BadgeMilkFreeText
-import com.example.ui.theme.BadgeVeganBg
-import com.example.ui.theme.BadgeVeganText
-import com.example.ui.theme.BrandBlue
+import fi.pushan.unicafedaily.domain.model.CustomerCategory
+import fi.pushan.unicafedaily.ui.theme.BadgeAllergenBg
+import fi.pushan.unicafedaily.ui.theme.BadgeAllergenText
+import fi.pushan.unicafedaily.ui.theme.BadgeGlutenFreeBg
+import fi.pushan.unicafedaily.ui.theme.BadgeGlutenFreeText
+import fi.pushan.unicafedaily.ui.theme.BadgeMilkFreeBg
+import fi.pushan.unicafedaily.ui.theme.BadgeMilkFreeText
+import fi.pushan.unicafedaily.ui.theme.BadgeVeganBg
+import fi.pushan.unicafedaily.ui.theme.BadgeVeganText
+import fi.pushan.unicafedaily.ui.theme.BrandBlue
 
 private data class DietSymbol(
     val code: String,

@@ -1,4 +1,4 @@
-package com.example.ui.components
+package fi.pushan.unicafedaily.ui.components
 
 import android.content.Context
 import android.content.Intent
@@ -61,10 +61,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.domain.model.CustomerCategory
-import com.example.domain.model.Meal
-import com.example.domain.model.Restaurant
-import com.example.ui.theme.BrandBlue
+import fi.pushan.unicafedaily.domain.model.CustomerCategory
+import fi.pushan.unicafedaily.domain.model.Meal
+import fi.pushan.unicafedaily.domain.model.Restaurant
+import fi.pushan.unicafedaily.ui.theme.BrandBlue
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable

@@ -49,6 +49,8 @@ object UniCafeMapper {
             address = dto.address?.trim() ?: (dto.menuData?.address?.trim() ?: ""),
             phone = dto.menuData?.phone?.trim(),
             email = dto.menuData?.email?.trim(),
+            description = dto.menuData?.description?.trim(),
+            websiteUrl = dto.permalink?.trim() ?: "https://unicafe.fi",
             visitingHours = visitingHours,
             status = status,
             todaysMeals = todaysMeals,
@@ -58,15 +60,50 @@ object UniCafeMapper {
     }
 
     fun mapToMeal(dto: MealDto, id: String): Meal {
-        val studentPriceRaw = dto.price?.value?.student ?: dto.price?.value?.studentHyy
-        val normalPriceRaw = dto.price?.value?.normal
+        val categoryName = dto.price?.name?.trim() ?: "Lounas"
+        val lowerCat = categoryName.lowercase(Locale.ROOT)
+        val lowerName = dto.name.lowercase(Locale.ROOT)
 
-        val formattedStudentPrice = studentPriceRaw?.takeIf { it.isNotBlank() }?.let {
-            if (it.startsWith("€")) it else "€$it"
+        val isSpecial = lowerCat.contains("erikois") || lowerCat.contains("special") ||
+                lowerName.contains("päivän erikoinen") || lowerCat.contains("today's special")
+        val isBuffet = lowerCat.contains("buffet") || lowerCat.contains("noutopöytä")
+        val isBreakfast = lowerCat.contains("aamiainen") || lowerCat.contains("breakfast") || lowerCat.contains("frukost")
+
+        val defaultStudent = when {
+            isSpecial -> "€5.30"
+            isBuffet -> "€10.50"
+            isBreakfast -> "€4.00"
+            else -> "€3.10"
         }
-        val formattedNormalPrice = normalPriceRaw?.takeIf { it.isNotBlank() }?.let {
-            if (it.startsWith("€")) it else "€$it"
+        val defaultGraduate = when {
+            isSpecial -> "€8.75"
+            isBuffet -> "€11.00"
+            isBreakfast -> "€4.50"
+            else -> "€6.35"
         }
+        val defaultStaff = when {
+            isSpecial -> "€8.90"
+            isBuffet -> "€11.00"
+            isBreakfast -> "€4.50"
+            else -> "€7.30"
+        }
+        val defaultNormal = when {
+            isSpecial -> "€11.50"
+            isBuffet -> "€13.00"
+            isBreakfast -> "€4.50"
+            else -> "€9.80"
+        }
+
+        fun formatPrice(raw: String?, default: String): String {
+            if (raw.isNullOrBlank()) return default
+            val clean = raw.trim().replace(",", ".")
+            return if (clean.startsWith("€")) clean else "€$clean"
+        }
+
+        val formattedStudentPrice = formatPrice(dto.price?.value?.student ?: dto.price?.value?.studentHyy, defaultStudent)
+        val formattedGraduatePrice = formatPrice(dto.price?.value?.graduate ?: dto.price?.value?.graduateHyy, defaultGraduate)
+        val formattedStaffPrice = formatPrice(dto.price?.value?.contract, defaultStaff)
+        val formattedNormalPrice = formatPrice(dto.price?.value?.normal, defaultNormal)
 
         val rawBadges = dto.meta?.get("0") ?: emptyList()
         val dietaryBadges = rawBadges.map { it.trim() }.filter { it.isNotEmpty() }
@@ -90,7 +127,6 @@ object UniCafeMapper {
         }
 
         val parsedNutrition = fi.pushan.unicafedaily.domain.model.NutritionInfo.parse(dto.nutrition)
-        val categoryName = dto.price?.name?.trim() ?: "Lounas"
         val detectedMealType = fi.pushan.unicafedaily.domain.model.MealType.detect(dto.name, categoryName, dietaryBadges)
         val parsedIngredients = parseIngredients(ingredientsCleaned)
 
@@ -100,6 +136,8 @@ object UniCafeMapper {
             category = categoryName,
             studentPrice = formattedStudentPrice,
             normalPrice = formattedNormalPrice,
+            graduatePrice = formattedGraduatePrice,
+            staffPrice = formattedStaffPrice,
             dietaryBadges = dietaryBadges,
             allergens = allergens,
             ingredients = ingredientsCleaned,
@@ -169,51 +207,62 @@ object UniCafeMapper {
             )
         }
 
-        // Check lunch hours first as UniCafe is primarily a student lunch provider
         val lunchSection = visitingHours.lounas
         val businessSection = visitingHours.business
 
-        val sectionToEvaluate = lunchSection ?: businessSection
-        if (sectionToEvaluate == null || sectionToEvaluate.items.isNullOrEmpty()) {
+        val allItems = (lunchSection?.items.orEmpty() + businessSection?.items.orEmpty()).distinct()
+        if (allItems.isEmpty()) {
             return RestaurantStatus(
                 state = fi.pushan.unicafedaily.domain.model.StatusState.CLOSED,
                 isOpenNow = false,
-                displayText = "CLOSED • No lunch service",
+                displayText = "CLOSED • No service hours",
                 shortStatus = "CLOSED",
-                hoursDescription = "No lunch service"
+                hoursDescription = "No service hours"
             )
         }
 
         val dayOfWeek = targetDate.dayOfWeek
-        val dayOfMonth = targetDate.dayOfMonth
-        val month = targetDate.monthValue
 
-        // 1. Check for temporary date exceptions like "15.6.-31.12." or exception == true
-        val exceptionItem = sectionToEvaluate.items.firstOrNull { item ->
-            item.exception == true || isDateInExceptionRange(item.label, dayOfMonth, month)
+        // 1. Check for seasonal/holiday exceptions ONLY if today falls inside that exception date range
+        val activeException = allItems.firstOrNull { item ->
+            isDateInExceptionRange(item.label, targetDate)
         }
 
-        if (exceptionItem != null) {
-            val isClosedException = exceptionItem.closedException == true ||
-                    exceptionItem.hours?.contains("suljettu", ignoreCase = true) == true
+        if (activeException != null) {
+            val isClosedException = activeException.closedException == true ||
+                    activeException.hours?.contains("suljettu", ignoreCase = true) == true ||
+                    activeException.hours?.contains("closed", ignoreCase = true) == true ||
+                    activeException.hours?.contains("stängt", ignoreCase = true) == true
             if (isClosedException) {
+                val nextOpeningDesc = findNextOpening(allItems, dayOfWeek)
+                val nextText = if (nextOpeningDesc != null) " • $nextOpeningDesc" else ""
                 return RestaurantStatus(
                     state = fi.pushan.unicafedaily.domain.model.StatusState.CLOSED,
                     isOpenNow = false,
-                    displayText = "CLOSED • Seasonally closed",
+                    displayText = "CLOSED • Seasonally closed$nextText",
                     shortStatus = "CLOSED",
-                    hoursDescription = "Closed (${exceptionItem.label ?: "Seasonal"})"
+                    hoursDescription = "Closed (${activeException.label ?: "Seasonal"})",
+                    countdownText = "Closed today",
+                    nextOpeningText = nextOpeningDesc
                 )
             }
         }
 
-        val nextOpeningDesc = findNextOpening(sectionToEvaluate.items, dayOfWeek)
+        val nextOpeningDesc = findNextOpening(allItems, dayOfWeek)
 
-        val todayScheduleItem = sectionToEvaluate.items.firstOrNull { item ->
-            item.exception != true && matchesDayOfWeek(item.label, dayOfWeek)
-        }
+        // 2. Find today's active schedule item (prefer lunch schedule, fallback to business schedule)
+        val todayScheduleItem = (lunchSection?.items?.firstOrNull { item ->
+            !isDateInExceptionRange(item.label, targetDate) && matchesDayOfWeek(item.label, dayOfWeek)
+        } ?: businessSection?.items?.firstOrNull { item ->
+            !isDateInExceptionRange(item.label, targetDate) && matchesDayOfWeek(item.label, dayOfWeek)
+        })
 
-        if (todayScheduleItem == null || todayScheduleItem.closedException == true || todayScheduleItem.hours?.contains("suljettu", ignoreCase = true) == true) {
+        val isExplicitlyClosed = todayScheduleItem?.closedException == true ||
+                todayScheduleItem?.hours?.contains("suljettu", ignoreCase = true) == true ||
+                todayScheduleItem?.hours?.contains("closed", ignoreCase = true) == true ||
+                todayScheduleItem?.hours?.contains("stängt", ignoreCase = true) == true
+
+        if (todayScheduleItem == null || isExplicitlyClosed) {
             val nextText = if (nextOpeningDesc != null) " • $nextOpeningDesc" else ""
             return RestaurantStatus(
                 state = fi.pushan.unicafedaily.domain.model.StatusState.CLOSED,
@@ -295,11 +344,13 @@ object UniCafeMapper {
 
     private fun findNextOpening(items: List<VisitingHoursItemDto>?, currentDayOfWeek: DayOfWeek): String? {
         if (items.isNullOrEmpty()) return null
-        for (offset in 1..6) {
+        for (offset in 1..7) {
             val checkDay = currentDayOfWeek.plus(offset.toLong())
             val matchingItem = items.firstOrNull { item ->
-                item.exception != true && item.closedException != true &&
+                item.closedException != true &&
                         item.hours?.contains("suljettu", ignoreCase = true) != true &&
+                        item.hours?.contains("closed", ignoreCase = true) != true &&
+                        item.hours?.contains("stängt", ignoreCase = true) != true &&
                         matchesDayOfWeek(item.label, checkDay)
             }
             if (matchingItem != null) {
@@ -326,7 +377,10 @@ object UniCafeMapper {
             TimeSchedule(
                 label = it.label ?: "",
                 hours = it.hours ?: "",
-                isClosed = it.closedException == true || it.hours?.contains("suljettu", ignoreCase = true) == true
+                isClosed = it.closedException == true ||
+                        it.hours?.contains("suljettu", ignoreCase = true) == true ||
+                        it.hours?.contains("closed", ignoreCase = true) == true ||
+                        it.hours?.contains("stängt", ignoreCase = true) == true
             )
         } ?: emptyList()
 
@@ -334,7 +388,10 @@ object UniCafeMapper {
             TimeSchedule(
                 label = it.label ?: "",
                 hours = it.hours ?: "",
-                isClosed = it.closedException == true || it.hours?.contains("suljettu", ignoreCase = true) == true
+                isClosed = it.closedException == true ||
+                        it.hours?.contains("suljettu", ignoreCase = true) == true ||
+                        it.hours?.contains("closed", ignoreCase = true) == true ||
+                        it.hours?.contains("stängt", ignoreCase = true) == true
             )
         } ?: emptyList()
 
@@ -345,73 +402,132 @@ object UniCafeMapper {
     }
 
     /**
-     * Checks if a Finnish weekday label matches a given DayOfWeek.
+     * Checks if a weekday label in Finnish, English, or Swedish matches a given DayOfWeek.
      * Examples of labels in UniCafe API:
-     * "Ma–Pe", "Ma-Pe", "Ma–To", "Pe", "La", "La–Su", "Ma-Su", "Ma–La"
+     * "Ma–Pe", "Ma-Pe", "Mon–Fri", "Mon-Fri", "Mån–Fre", "Mon–Thu", "Ma–To",
+     * "La–Su", "Sat–Sun", "Lör–Sön", "Pe", "Fri", "Fre", "La", "Sat", "Lör", "Su", "Sun", "Sön"
      */
     fun matchesDayOfWeek(label: String?, dayOfWeek: DayOfWeek): Boolean {
         if (label.isNullOrBlank()) return false
-        val normalized = label.replace("–", "-").trim().lowercase(Locale.ROOT)
+        val normalized = label.replace("–", "-")
+            .replace("—", "-")
+            .replace(" ", "")
+            .trim()
+            .lowercase(Locale.ROOT)
 
-        return when {
-            normalized.contains("ma-pe") || normalized.contains("ma–pe") -> {
-                dayOfWeek in listOf(
-                    DayOfWeek.MONDAY,
-                    DayOfWeek.TUESDAY,
-                    DayOfWeek.WEDNESDAY,
-                    DayOfWeek.THURSDAY,
-                    DayOfWeek.FRIDAY
-                )
-            }
-            normalized.contains("ma-to") || normalized.contains("ma–to") -> {
-                dayOfWeek in listOf(
-                    DayOfWeek.MONDAY,
-                    DayOfWeek.TUESDAY,
-                    DayOfWeek.WEDNESDAY,
-                    DayOfWeek.THURSDAY
-                )
-            }
-            normalized.contains("la-su") || normalized.contains("la–su") -> {
-                dayOfWeek in listOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)
-            }
-            normalized.contains("ma-su") || normalized.contains("ma–su") -> {
-                true
-            }
-            normalized.contains("ma-la") || normalized.contains("ma–la") -> {
-                dayOfWeek != DayOfWeek.SUNDAY
-            }
-            normalized == "ma" -> dayOfWeek == DayOfWeek.MONDAY
-            normalized == "ti" -> dayOfWeek == DayOfWeek.TUESDAY
-            normalized == "ke" -> dayOfWeek == DayOfWeek.WEDNESDAY
-            normalized == "to" -> dayOfWeek == DayOfWeek.THURSDAY
-            normalized == "pe" -> dayOfWeek == DayOfWeek.FRIDAY
-            normalized == "la" -> dayOfWeek == DayOfWeek.SATURDAY
-            normalized == "su" -> dayOfWeek == DayOfWeek.SUNDAY
-            else -> false
+        // Mon-Fri / Ma-Pe / Mån-Fre
+        if (normalized.contains("ma-pe") || normalized.contains("mon-fri") || normalized.contains("mån-fre")) {
+            return dayOfWeek in listOf(
+                DayOfWeek.MONDAY,
+                DayOfWeek.TUESDAY,
+                DayOfWeek.WEDNESDAY,
+                DayOfWeek.THURSDAY,
+                DayOfWeek.FRIDAY
+            )
+        }
+
+        // Mon-Thu / Ma-To / Mån-Tors
+        if (normalized.contains("ma-to") || normalized.contains("mon-thu") ||
+            normalized.contains("mån-tors") || normalized.contains("mån-tor") ||
+            normalized.contains("mon-thurs")) {
+            return dayOfWeek in listOf(
+                DayOfWeek.MONDAY,
+                DayOfWeek.TUESDAY,
+                DayOfWeek.WEDNESDAY,
+                DayOfWeek.THURSDAY
+            )
+        }
+
+        // Sat-Sun / La-Su / Lör-Sön
+        if (normalized.contains("la-su") || normalized.contains("sat-sun") || normalized.contains("lör-sön")) {
+            return dayOfWeek in listOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)
+        }
+
+        // Mon-Sun / Ma-Su / Mån-Sön
+        if (normalized.contains("ma-su") || normalized.contains("mon-sun") || normalized.contains("mån-sön")) {
+            return true
+        }
+
+        // Mon-Sat / Ma-La / Mån-Lör
+        if (normalized.contains("ma-la") || normalized.contains("mon-sat") || normalized.contains("mån-lör")) {
+            return dayOfWeek != DayOfWeek.SUNDAY
+        }
+
+        // Single days
+        val isMon = normalized == "ma" || normalized == "mon" || normalized == "mån" ||
+                normalized == "maanantai" || normalized == "monday" || normalized == "måndag"
+        val isTue = normalized == "ti" || normalized == "tue" || normalized == "tis" ||
+                normalized == "tiistai" || normalized == "tuesday" || normalized == "tisdag"
+        val isWed = normalized == "ke" || normalized == "wed" || normalized == "ons" ||
+                normalized == "keskiviikko" || normalized == "wednesday" || normalized == "onsdag"
+        val isThu = normalized == "to" || normalized == "thu" || normalized == "tors" || normalized == "tor" ||
+                normalized == "torstai" || normalized == "thursday" || normalized == "torsdag"
+        val isFri = normalized == "pe" || normalized == "fri" || normalized == "fre" ||
+                normalized == "perjantai" || normalized == "friday" || normalized == "fredag"
+        val isSat = normalized == "la" || normalized == "sat" || normalized == "lör" ||
+                normalized == "lauantai" || normalized == "saturday" || normalized == "lördag"
+        val isSun = normalized == "su" || normalized == "sun" || normalized == "sön" ||
+                normalized == "sunnuntai" || normalized == "sunday" || normalized == "söndag"
+
+        return when (dayOfWeek) {
+            DayOfWeek.MONDAY -> isMon
+            DayOfWeek.TUESDAY -> isTue
+            DayOfWeek.WEDNESDAY -> isWed
+            DayOfWeek.THURSDAY -> isThu
+            DayOfWeek.FRIDAY -> isFri
+            DayOfWeek.SATURDAY -> isSat
+            DayOfWeek.SUNDAY -> isSun
         }
     }
 
     /**
-     * Checks if today's date falls within a seasonal date range like "15.6.-31.12."
+     * Checks if targetDate falls within a seasonal date range or single date exception.
+     * Examples: "15.6.-31.12.", "15.6.-23.8.", "1.-12.6.", "4.5.-16.8.", "24.12."
      */
-    private fun isDateInExceptionRange(label: String?, day: Int, month: Int): Boolean {
-        if (label == null || !label.contains("-")) return false
+    fun isDateInExceptionRange(label: String?, targetDate: LocalDate): Boolean {
+        if (label.isNullOrBlank()) return false
+        val clean = label.replace("–", "-")
+            .replace("—", "-")
+            .replace(" ", "")
+            .trim()
+        val day = targetDate.dayOfMonth
+        val month = targetDate.monthValue
+        val curVal = month * 100 + day
+
         try {
-            val parts = label.replace("–", "-").split("-")
-            if (parts.size == 2) {
-                val startParts = parts[0].trim().split(".")
-                val endParts = parts[1].trim().split(".")
-                if (startParts.size >= 2 && endParts.size >= 2) {
-                    val startDay = startParts[0].toIntOrNull() ?: return false
-                    val startMonth = startParts[1].toIntOrNull() ?: return false
-                    val endDay = endParts[0].toIntOrNull() ?: return false
-                    val endMonth = endParts[1].toIntOrNull() ?: return false
+            if (clean.contains("-")) {
+                val parts = clean.split("-")
+                if (parts.size == 2) {
+                    val endTokens = parts[1].trim().split(".").filter { it.isNotBlank() }
+                    if (endTokens.size >= 2) {
+                        val endDay = endTokens[0].toIntOrNull() ?: return false
+                        val endMonth = endTokens[1].toIntOrNull() ?: return false
+                        val endVal = endMonth * 100 + endDay
 
-                    val currentVal = month * 100 + day
-                    val startVal = startMonth * 100 + startDay
-                    val endVal = endMonth * 100 + endDay
+                        val startTokens = parts[0].trim().split(".").filter { it.isNotBlank() }
+                        val startDay = startTokens[0].toIntOrNull() ?: return false
+                        val startMonth = if (startTokens.size >= 2) {
+                            startTokens[1].toIntOrNull() ?: endMonth
+                        } else {
+                            endMonth // e.g. "1.-12.6." -> start month is 6 (same as end month)
+                        }
+                        val startVal = startMonth * 100 + startDay
 
-                    return currentVal in startVal..endVal
+                        return if (startVal <= endVal) {
+                            curVal in startVal..endVal
+                        } else {
+                            // Span across year-end (e.g. 20.12.-6.1.)
+                            curVal >= startVal || curVal <= endVal
+                        }
+                    }
+                }
+            } else {
+                // Single date like "24.12."
+                val tokens = clean.split(".").filter { it.isNotBlank() }
+                if (tokens.size >= 2) {
+                    val exDay = tokens[0].toIntOrNull()
+                    val exMonth = tokens[1].toIntOrNull()
+                    return exDay == day && exMonth == month
                 }
             }
         } catch (_: Exception) {

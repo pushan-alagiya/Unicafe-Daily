@@ -129,6 +129,7 @@ fun FoodDetailSheet(
     onToggleFavoriteMeal: (() -> Unit)? = null,
     isEatenToday: Boolean = false,
     onRecordEaten: (() -> Unit)? = null,
+    customerCategory: fi.pushan.unicafedaily.domain.model.CustomerCategory = fi.pushan.unicafedaily.domain.model.CustomerCategory.STUDENT,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -258,48 +259,48 @@ fun FoodDetailSheet(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Restaurant & Price Header
+            Text(
+                text = "Served at $restaurantName",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Pricing Tiers Bar
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = "Served at $restaurantName",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                val studentP = meal.studentPrice ?: "€3.10"
+                val gradP = meal.graduatePrice ?: "€6.35"
+                val staffP = meal.staffPrice ?: "€7.30"
+                val normP = meal.normalPrice ?: "€9.80"
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    meal.studentPrice?.let { price ->
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = BrandBlue,
-                            modifier = Modifier.padding(end = 6.dp)
-                        ) {
-                            Text(
-                                text = "Student $price",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.labelMedium,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                            )
-                        }
-                    }
-                    meal.normalPrice?.let { price ->
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant
-                        ) {
-                            Text(
-                                text = "Normal $price",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.Medium,
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                            )
-                        }
-                    }
-                }
+                PricePill(
+                    label = "Student",
+                    price = studentP,
+                    isSelected = customerCategory == fi.pushan.unicafedaily.domain.model.CustomerCategory.STUDENT,
+                    modifier = Modifier.weight(1f)
+                )
+                PricePill(
+                    label = "Post-grad",
+                    price = gradP,
+                    isSelected = customerCategory == fi.pushan.unicafedaily.domain.model.CustomerCategory.GRADUATE,
+                    modifier = Modifier.weight(1f)
+                )
+                PricePill(
+                    label = "Staff",
+                    price = staffP,
+                    isSelected = customerCategory == fi.pushan.unicafedaily.domain.model.CustomerCategory.STAFF,
+                    modifier = Modifier.weight(1f)
+                )
+                PricePill(
+                    label = "Normal",
+                    price = normP,
+                    isSelected = customerCategory == fi.pushan.unicafedaily.domain.model.CustomerCategory.NORMAL,
+                    modifier = Modifier.weight(1f)
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -799,6 +800,11 @@ fun DetailedDietaryChip(badge: String, isDark: Boolean = false, modifier: Modifi
             if (isDark) Color(0xFFFEF08A) else Color(0xFF854D0E),
             "Low lactose"
         )
+        badge.equals("KELA", ignoreCase = true) -> Triple(
+            if (isDark) Color(0xFF1E1B4B) else Color(0xFFE0E7FF),
+            if (isDark) Color(0xFFA5B4FC) else Color(0xFF3730A3),
+            "Kela student subsidy recommended"
+        )
         else -> Triple(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant, badge)
     }
 
@@ -814,6 +820,7 @@ fun DetailedDietaryChip(badge: String, isDark: Boolean = false, modifier: Modifi
             badge.equals("G", ignoreCase = true) -> Icons.Default.Grass
             badge.equals("M", ignoreCase = true) -> Icons.Default.Opacity
             badge.equals("Ilmastovalinta", ignoreCase = true) -> Icons.Default.Eco
+            badge.equals("KELA", ignoreCase = true) -> Icons.Default.Restaurant
             else -> Icons.Default.Restaurant
         }
 
@@ -864,5 +871,38 @@ private fun shareMeal(context: Context, meal: Meal, restaurantName: String) {
         context.startActivity(chooser)
     } catch (e: Exception) {
         android.util.Log.e("FoodDetailSheet", "Failed to share meal", e)
+    }
+}
+
+@Composable
+private fun PricePill(
+    label: String,
+    price: String,
+    isSelected: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = if (isSelected) BrandBlue else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        modifier = modifier
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(vertical = 6.dp, horizontal = 4.dp)
+        ) {
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = price,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
 }

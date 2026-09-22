@@ -38,6 +38,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Info
+import fi.pushan.unicafedaily.domain.model.CustomerCategory
 import fi.pushan.unicafedaily.domain.model.DietaryFilter
 import fi.pushan.unicafedaily.domain.model.Meal
 import fi.pushan.unicafedaily.domain.model.Restaurant
@@ -49,6 +52,8 @@ fun RestaurantCard(
     favoriteMealNames: Set<String> = emptySet(),
     eatenMealNames: Set<String> = emptySet(),
     dateFormatted: String = "",
+    customerCategory: CustomerCategory = CustomerCategory.STUDENT,
+    onOpenRestaurantDetail: ((Restaurant) -> Unit)? = null,
     onToggleFavoriteMeal: ((String) -> Unit)? = null,
     onMealClick: (Meal, Restaurant) -> Unit,
     modifier: Modifier = Modifier
@@ -77,13 +82,21 @@ fun RestaurantCard(
                 .fillMaxWidth()
                 .padding(14.dp)
         ) {
-            // Header Row: Restaurant Name + Status Badge & Share
+            // Header Row: Restaurant Name + Status Badge & Share + Info
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(
+                            if (onOpenRestaurantDetail != null) {
+                                Modifier.clickable { onOpenRestaurantDetail(restaurant) }
+                            } else Modifier
+                        )
+                ) {
                     Text(
                         text = restaurant.name,
                         style = MaterialTheme.typography.titleLarge,
@@ -124,6 +137,21 @@ fun RestaurantCard(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     StatusBadge(status = restaurant.status)
+
+                    if (onOpenRestaurantDetail != null) {
+                        IconButton(
+                            onClick = { onOpenRestaurantDetail(restaurant) },
+                            modifier = Modifier.size(32.dp).testTag("info_restaurant_${restaurant.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Restaurant info and opening hours",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
                     IconButton(
                         onClick = { shareRestaurantMenu(context, restaurant, dateFormatted) },
                         modifier = Modifier.size(32.dp).testTag("share_restaurant_${restaurant.id}")
@@ -222,7 +250,8 @@ fun RestaurantCard(
                         onToggleFavorite = if (onToggleFavoriteMeal != null) {
                             { onToggleFavoriteMeal(meal.name) }
                         } else null,
-                        isRecentlyEaten = isEaten
+                        isRecentlyEaten = isEaten,
+                        customerCategory = customerCategory
                     )
                 }
             }

@@ -43,6 +43,7 @@ class UserPreferencesRepository(private val context: Context) {
         private val KEY_NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
         private val KEY_MONTHLY_BUDGET_EUR = stringPreferencesKey("monthly_budget_eur")
         private val KEY_RECENTLY_VIEWED_JSON = stringPreferencesKey("recently_viewed_dishes_json")
+        private val KEY_CUSTOMER_CATEGORY = stringPreferencesKey("customer_category")
 
         @Volatile
         private var INSTANCE: UserPreferencesRepository? = null
@@ -126,6 +127,13 @@ class UserPreferencesRepository(private val context: Context) {
             } catch (_: Exception) {
                 MyDietPreference.NONE
             }
+        }
+        .distinctUntilChanged()
+
+    val customerCategoryFlow: Flow<fi.pushan.unicafedaily.domain.model.CustomerCategory> = context.dataStore.data
+        .map { prefs ->
+            val raw = prefs[KEY_CUSTOMER_CATEGORY]
+            fi.pushan.unicafedaily.domain.model.CustomerCategory.fromId(raw)
         }
         .distinctUntilChanged()
 
@@ -319,6 +327,12 @@ class UserPreferencesRepository(private val context: Context) {
     suspend fun clearRecentlyViewed() {
         context.dataStore.edit { prefs ->
             prefs.remove(KEY_RECENTLY_VIEWED_JSON)
+        }
+    }
+
+    suspend fun setCustomerCategory(category: fi.pushan.unicafedaily.domain.model.CustomerCategory) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_CUSTOMER_CATEGORY] = category.id
         }
     }
 }

@@ -26,6 +26,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 
+
 private data class PrefsPart1(
     val favIds: Set<Int>,
     val orderedFavIds: List<Int>,
@@ -37,7 +38,8 @@ private data class PrefsPart2(
     val favMeals: Set<String>,
     val myDiet: fi.pushan.unicafedaily.domain.model.MyDietPreference,
     val lang: String,
-    val statusFilter: String
+    val statusFilter: String,
+    val customerCategory: fi.pushan.unicafedaily.domain.model.CustomerCategory
 )
 
 private data class UserPrefsBundle(
@@ -48,7 +50,8 @@ private data class UserPrefsBundle(
     val favMeals: Set<String>,
     val myDiet: fi.pushan.unicafedaily.domain.model.MyDietPreference,
     val appLang: String,
-    val statusFilter: String
+    val statusFilter: String,
+    val customerCategory: fi.pushan.unicafedaily.domain.model.CustomerCategory
 )
 
 private data class FeaturePrefsBundle(
@@ -87,9 +90,10 @@ class UniCafeViewModel(application: Application) : AndroidViewModel(application)
                 repository.favoriteMealNamesFlow,
                 repository.myDietPreferenceFlow,
                 repository.appLanguageFlow,
-                repository.statusFilterFlow
-            ) { favMeals, myDiet, lang, statusFilter ->
-                PrefsPart2(favMeals, myDiet, lang, statusFilter)
+                repository.statusFilterFlow,
+                repository.customerCategoryFlow
+            ) { favMeals, myDiet, lang, statusFilter, category ->
+                PrefsPart2(favMeals, myDiet, lang, statusFilter, category)
             }
 
             combine(part1Flow, part2Flow) { p1, p2 ->
@@ -101,7 +105,8 @@ class UniCafeViewModel(application: Application) : AndroidViewModel(application)
                     favMeals = p2.favMeals,
                     myDiet = p2.myDiet,
                     appLang = p2.lang,
-                    statusFilter = p2.statusFilter
+                    statusFilter = p2.statusFilter,
+                    customerCategory = p2.customerCategory
                 )
             }.collect { bundle ->
                 _uiState.update { current ->
@@ -123,7 +128,8 @@ class UniCafeViewModel(application: Application) : AndroidViewModel(application)
                         favoriteMealNames = bundle.favMeals,
                         myDietPreference = bundle.myDiet,
                         appLanguage = bundle.appLang,
-                        statusFilter = bundle.statusFilter
+                        statusFilter = bundle.statusFilter,
+                        customerCategory = bundle.customerCategory
                     )
                 }
                 UniCafeWidgetUpdater.updateAll(getApplication())
@@ -172,18 +178,19 @@ class UniCafeViewModel(application: Application) : AndroidViewModel(application)
 
     private data class Tuple4<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
 
-    fun loadData(forceNetwork: Boolean = false) {
+    fun loadData(forceNetwork: Boolean = false, language: String? = null) {
         viewModelScope.launch {
+            val targetLang = language ?: _uiState.value.appLanguage
             _uiState.update {
                 it.copy(
                     isLoading = it.favoriteRestaurants.isEmpty() && it.allRestaurants.isEmpty(),
                     isRefreshing = forceNetwork,
                     errorMessage = null,
-                    formattedDate = getCurrentDateFormatted(it.appLanguage)
+                    formattedDate = getCurrentDateFormatted(targetLang)
                 )
             }
 
-            when (val result = repository.fetchRestaurants(forceNetwork = forceNetwork)) {
+            when (val result = repository.fetchRestaurants(forceNetwork = forceNetwork, language = targetLang)) {
                 is MenuFetchResult.Success -> {
                     allLoadedRestaurants = result.restaurants
                     val orderedFavIds = _uiState.value.orderedFavoriteIds
@@ -294,6 +301,7 @@ class UniCafeViewModel(application: Application) : AndroidViewModel(application)
     fun onToggleFavoriteMeal(mealName: String) {
         viewModelScope.launch {
             repository.toggleFavoriteMeal(mealName)
+            UniCafeWidgetUpdater.updateAll(getApplication())
         }
     }
 
@@ -301,7 +309,8 @@ class UniCafeViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             repository.setAppLanguage(lang)
             _uiState.update { it.copy(appLanguage = lang, formattedDate = getCurrentDateFormatted(lang)) }
-            loadData(forceNetwork = true)
+            loadData(forceNetwork = true, language = lang)
+            UniCafeWidgetUpdater.updateAll(getApplication())
         }
     }
 
@@ -456,6 +465,43 @@ class UniCafeViewModel(application: Application) : AndroidViewModel(application)
             repository.setOrderedFavorites(current)
             UniCafeWidgetUpdater.updateAll(getApplication())
         }
+    }
+
+    fun onToggleFavoriteRestaurant(restaurantId: Int) {
+        val canonicalId = RestaurantCanonicalMapper.getCanonicalId(restaurantId)
+        val isFav = _uiState.value.favoriteIds.any { RestaurantCanonicalMapper.getCanonicalId(it) == canonicalId }
+        if (isFav) {
+            onRemoveFavorite(restaurantId)
+        } else {
+            onAddFavorite(restaurantId)
+        }
+    }
+
+    fun onSetCustomerCategory(category: fi.pushan.unicafedaily.domain.model.CustomerCategory) {
+        viewModelScope.launch {
+            repository.setCustomerCategory(category)
+            UniCafeWidgetUpdater.updateAll(getApplication())
+        }
+    }
+
+    fun onSelectRestaurantForDetail(restaurant: Restaurant?) {
+        _uiState.update { it.copy(selectedRestaurantForDetail = restaurant) }
+    }
+
+    fun onOpenFavoriteDishes() {
+        _uiState.update { it.copy(showFavoriteDishesSheet = true) }
+    }
+
+    fun onDismissFavoriteDishes() {
+        _uiState.update { it.copy(showFavoriteDishesSheet = false) }
+    }
+
+    fun onOpenUniCafeInfo() {
+        _uiState.update { it.copy(showUniCafeInfoSheet = true) }
+    }
+
+    fun onDismissUniCafeInfo() {
+        _uiState.update { it.copy(showUniCafeInfoSheet = false) }
     }
 
     private fun getCurrentDateFormatted(language: String = "en"): String {
