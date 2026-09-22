@@ -83,8 +83,8 @@ private data class PriceRow(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun UniCafeInfoSheet(
-    selectedCategory: CustomerCategory,
-    onCategorySelected: (CustomerCategory) -> Unit,
+    selectedCategory: CustomerCategory = CustomerCategory.STUDENT,
+    onCategorySelected: (CustomerCategory) -> Unit = {},
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -124,10 +124,10 @@ fun UniCafeInfoSheet(
 
     val standardPriceRows = remember {
         listOf(
-            PriceRow("Lunch", "€3.10", "€6.35", "€7.30", "€9.80"),
+            PriceRow("Standard Lunch", "€3.10", "€6.35", "€7.30", "€9.80"),
             PriceRow("Today's Special", "€5.30", "€8.75", "€8.90", "€11.50"),
             PriceRow("Buffet", "€10.50", "€11.00", "€11.00", "€13.00"),
-            PriceRow("Breakfast (Biokeskus & Porthania)", "€4.00", "€4.00", "€4.50", "€4.50")
+            PriceRow("Breakfast", "€4.00", "€4.00", "€4.50", "€4.50")
         )
     }
 
@@ -251,23 +251,35 @@ fun UniCafeInfoSheet(
                                     imageVector = Icons.Default.Payments,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(24.dp)
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Prices across the app are customized for: ${selectedCategory.displayName}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Active Rate: ${selectedCategory.displayName}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = when (selectedCategory) {
+                                            CustomerCategory.STUDENT -> "Subsidized by Kela with valid Finnish student card"
+                                            CustomerCategory.GRADUATE -> "Post-graduate rate with valid student union card"
+                                            CustomerCategory.STAFF -> "University of Helsinki staff and pensioners"
+                                            CustomerCategory.NORMAL -> "Open to all visitors, visitors & public"
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
 
                         Spacer(modifier = Modifier.height(18.dp))
 
-                        // OFFICIAL PRICE LIST TABLE
+                        // Price Overview Table
                         Text(
-                            text = "OFFICIAL PRICE LIST (1.1.2026)",
+                            text = "PRICE LIST COMPARISON",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -282,28 +294,54 @@ fun UniCafeInfoSheet(
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 standardPriceRows.forEachIndexed { idx, row ->
-                                    Column {
-                                        Text(
-                                            text = row.title,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                                    val price = when (selectedCategory) {
+                                        CustomerCategory.STUDENT -> row.student
+                                        CustomerCategory.GRADUATE -> row.postGrad
+                                        CustomerCategory.STAFF -> row.staff
+                                        CustomerCategory.NORMAL -> row.normal
+                                    }
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = row.title,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = "Student: ${row.student} • Normal: ${row.normal}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.primaryContainer
                                         ) {
-                                            PriceChip(label = "Student", price = row.student, isHighlighted = selectedCategory == CustomerCategory.STUDENT)
-                                            PriceChip(label = "Post-grad", price = row.postGrad, isHighlighted = selectedCategory == CustomerCategory.GRADUATE)
-                                            PriceChip(label = "Staff", price = row.staff, isHighlighted = selectedCategory == CustomerCategory.STAFF)
-                                            PriceChip(label = "Normal", price = row.normal, isHighlighted = selectedCategory == CustomerCategory.NORMAL)
+                                            Text(
+                                                text = price,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                            )
                                         }
                                     }
+
                                     if (idx < standardPriceRows.lastIndex) {
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                        Spacer(modifier = Modifier.height(10.dp))
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(vertical = 4.dp),
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                        )
                                     }
                                 }
                             }
@@ -311,67 +349,29 @@ fun UniCafeInfoSheet(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // LEFTOVER LUNCH & EXTRAS
-                        Text(
-                            text = "LEFTOVER LUNCH & EXTRAS",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            letterSpacing = 0.8.sp
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
+                        // Kela Subsidy Note
                         Card(
                             shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(
-                                modifier = Modifier.padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.Top
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Leftover lunch (UniCafe container)", style = MaterialTheme.typography.bodyMedium)
-                                    Text("€3.00", fontWeight = FontWeight.Bold)
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Leftover lunch (Own container)", style = MaterialTheme.typography.bodyMedium)
-                                    Text("€2.70", fontWeight = FontWeight.Bold)
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Side salad", style = MaterialTheme.typography.bodyMedium)
-                                    Text("€1.00", fontWeight = FontWeight.Bold)
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Energy supplement", style = MaterialTheme.typography.bodyMedium)
-                                    Text("€0.70", fontWeight = FontWeight.Bold)
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Child lunch (0–12 yrs, Lunch / Special)", style = MaterialTheme.typography.bodyMedium)
-                                    Text("€5.85 / €6.85", fontWeight = FontWeight.Bold)
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Additional scoop (Lunch / Special)", style = MaterialTheme.typography.bodyMedium)
-                                    Text("€1.80 / €3.05", fontWeight = FontWeight.Bold)
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = BrandBlue,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Prices are regulated by the Finnish Social Insurance Institution (Kela). Student lunch includes a warm main dish, salad buffet, bread & spread, and a beverage.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 18.sp
+                                )
                             }
                         }
                     }
@@ -379,92 +379,7 @@ fun UniCafeInfoSheet(
                     1 -> {
                         // DIET SYMBOLS
                         Text(
-                            text = "SPECIAL DIET SYMBOLS",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            letterSpacing = 0.8.sp
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        dietSymbols.forEach { sym ->
-                            Card(
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = sym.bgColor,
-                                        modifier = Modifier.size(width = 54.dp, height = 36.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                text = sym.code,
-                                                color = sym.textColor,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                fontSize = 13.sp
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(
-                                            text = sym.name,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = sym.description,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    2 -> {
-                        // ALLERGENS
-                        Card(
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(14.dp),
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.WarningAmber,
-                                    contentDescription = null,
-                                    tint = Color(0xFFB45309),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = "If you have severe or life-threatening food allergies, please always verify recipe ingredients directly with our restaurant staff on-site.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF92400E),
-                                    lineHeight = 18.sp
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        Text(
-                            text = "14 COMMON EU & FINNISH ALLERGENS",
+                            text = "DIETARY MARKINGS & BADGES",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -478,24 +393,119 @@ fun UniCafeInfoSheet(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
-                                allergensList.forEachIndexed { idx, item ->
-                                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                                        Text(
-                                            text = "${idx + 1}. ${item.first}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = item.second,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                dietSymbols.forEachIndexed { idx, symbol ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 6.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = symbol.bgColor,
+                                            modifier = Modifier.width(52.dp)
+                                        ) {
+                                            Text(
+                                                text = symbol.code,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = symbol.textColor,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = symbol.name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = symbol.description,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                lineHeight = 16.sp
+                                            )
+                                        }
+                                    }
+
+                                    if (idx < dietSymbols.lastIndex) {
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(vertical = 4.dp),
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                         )
                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    2 -> {
+                        // ALLERGENS
+                        Text(
+                            text = "EU FOOD ALLERGEN REGULATIONS",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 0.8.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "UniCafe clearly marks all major food allergens per EU Regulation (EU) No 1169/2011.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                allergensList.forEachIndexed { idx, (allergen, examples) ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.WarningAmber,
+                                            contentDescription = null,
+                                            tint = Color(0xFFD97706),
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .padding(top = 2.dp)
+                                        )
+
+                                        Spacer(modifier = Modifier.width(8.dp))
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = allergen,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = examples,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+
                                     if (idx < allergensList.lastIndex) {
                                         HorizontalDivider(
-                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                            modifier = Modifier.padding(vertical = 4.dp)
+                                            modifier = Modifier.padding(vertical = 3.dp),
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                                         )
                                     }
                                 }
@@ -504,37 +514,6 @@ fun UniCafeInfoSheet(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun PriceChip(
-    label: String,
-    price: String,
-    isHighlighted: Boolean
-) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = if (isHighlighted) BrandBlue else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        modifier = Modifier.padding(horizontal = 2.dp)
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-        ) {
-            Text(
-                text = label,
-                fontSize = 10.sp,
-                fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
-                color = if (isHighlighted) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = price,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = if (isHighlighted) Color.White else MaterialTheme.colorScheme.onSurface
-            )
         }
     }
 }

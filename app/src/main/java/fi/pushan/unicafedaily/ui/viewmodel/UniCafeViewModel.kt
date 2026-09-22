@@ -129,7 +129,7 @@ class UniCafeViewModel(application: Application) : AndroidViewModel(application)
                         myDietPreference = bundle.myDiet,
                         appLanguage = bundle.appLang,
                         statusFilter = bundle.statusFilter,
-                        customerCategory = bundle.customerCategory
+                        selectedCustomerCategory = bundle.customerCategory
                     )
                 }
                 UniCafeWidgetUpdater.updateAll(getApplication())
@@ -428,6 +428,26 @@ class UniCafeViewModel(application: Application) : AndroidViewModel(application)
         _uiState.update { it.copy(showDietaryLegendSheet = false) }
     }
 
+    fun onOpenUniCafeInfo() {
+        _uiState.update { it.copy(showUniCafeInfoSheet = true) }
+    }
+
+    fun onDismissUniCafeInfo() {
+        _uiState.update { it.copy(showUniCafeInfoSheet = false) }
+    }
+
+    fun onSelectCustomerCategory(category: fi.pushan.unicafedaily.domain.model.CustomerCategory) {
+        _uiState.update { it.copy(selectedCustomerCategory = category) }
+    }
+
+    fun onOpenRestaurantDetail(restaurant: Restaurant) {
+        _uiState.update { it.copy(selectedRestaurantForDetail = restaurant) }
+    }
+
+    fun onDismissRestaurantDetail() {
+        _uiState.update { it.copy(selectedRestaurantForDetail = null) }
+    }
+
     fun onSaveFavorites(newFavoriteIds: Set<Int>) {
         viewModelScope.launch {
             val sanitized = newFavoriteIds.map { RestaurantCanonicalMapper.getCanonicalId(it) }.distinct().take(ApiConfig.MAX_FAVORITES)
@@ -494,14 +514,6 @@ class UniCafeViewModel(application: Application) : AndroidViewModel(application)
 
     fun onDismissFavoriteDishes() {
         _uiState.update { it.copy(showFavoriteDishesSheet = false) }
-    }
-
-    fun onOpenUniCafeInfo() {
-        _uiState.update { it.copy(showUniCafeInfoSheet = true) }
-    }
-
-    fun onDismissUniCafeInfo() {
-        _uiState.update { it.copy(showUniCafeInfoSheet = false) }
     }
 
     private fun getCurrentDateFormatted(language: String = "en"): String {

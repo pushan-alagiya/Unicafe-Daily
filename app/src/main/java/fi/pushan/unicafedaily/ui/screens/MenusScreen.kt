@@ -78,6 +78,7 @@ fun MenusScreen(
     uiState: HomeUiState,
     viewModel: UniCafeViewModel,
     onMealClick: (Meal, String) -> Unit,
+    onOpenRestaurantDetail: ((Restaurant) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -294,6 +295,7 @@ fun MenusScreen(
                                 eatenMealNames = uiState.eatenMeals.map { it.mealName }.toSet(),
                                 dateFormatted = "",
                                 onToggleFavoriteMeal = { viewModel.onToggleFavoriteMeal(it) },
+                                onOpenRestaurantDetail = onOpenRestaurantDetail,
                                 onMealClick = { meal, rest -> onMealClick(meal, rest.name) }
                             )
                         }

@@ -76,10 +76,6 @@ import fi.pushan.unicafedaily.ui.theme.BrandBlue
 import androidx.compose.material.icons.filled.Tune
 import fi.pushan.unicafedaily.ui.components.DietaryFilterChips
 
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.StarOutline
-import fi.pushan.unicafedaily.domain.model.CustomerCategory
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -93,12 +89,10 @@ fun HomeScreen(
     onOpenSurpriseMe: () -> Unit = {},
     onOpenBudgetHistory: () -> Unit = {},
     onToggleFavoriteMeal: (String) -> Unit = {},
+    onOpenRestaurantDetail: (Restaurant) -> Unit = {},
+    onOpenUniCafeInfo: () -> Unit = {},
     onMealClick: (Meal, String) -> Unit = { _, _ -> },
     onDismissMenuNotice: () -> Unit = {},
-    onOpenUniCafeInfo: () -> Unit = {},
-    onOpenFavoriteDishes: () -> Unit = {},
-    onSetCustomerCategory: (CustomerCategory) -> Unit = {},
-    onSelectRestaurantForDetail: (Restaurant) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedFavoriteRestId by remember { mutableStateOf<Int?>(null) }
@@ -170,27 +164,15 @@ fun HomeScreen(
                     }
                 },
                 actions = {
-                    // Favorite Dishes Button
-                    IconButton(
-                        onClick = onOpenFavoriteDishes,
-                        modifier = Modifier.testTag("fav_dishes_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = "Favorite Dishes",
-                            tint = if (uiState.favoriteMealNames.isNotEmpty()) Color(0xFFF59E0B) else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
                     // UniCafe Guide & Rates Info
                     IconButton(
                         onClick = onOpenUniCafeInfo,
-                        modifier = Modifier.testTag("home_info_button")
+                        modifier = Modifier.testTag("home_rates_info_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Info,
-                            contentDescription = "UniCafe Guide & Rates",
-                            tint = MaterialTheme.colorScheme.primary
+                            contentDescription = "UniCafe rates, student discounts and dietary guide",
+                            tint = BrandBlue
                         )
                     }
 
@@ -212,7 +194,7 @@ fun HomeScreen(
                         modifier = Modifier.testTag("manage_favorites_appbar_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.StarBorder,
+                            imageVector = Icons.Default.Star,
                             contentDescription = stringResource(R.string.choose_favorites),
                             tint = Color(0xFFD97706)
                         )
@@ -431,52 +413,6 @@ fun HomeScreen(
                     }
                 }
             } else {
-                // Category Rate Bar (Student, Post-grad, Staff, Normal)
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Rate:",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            CustomerCategory.entries.forEach { category ->
-                                val isSelected = uiState.customerCategory == category
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isSelected) BrandBlue else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { onSetCustomerCategory(category) }
-                                ) {
-                                    Text(
-                                        text = when (category) {
-                                            CustomerCategory.STUDENT -> "Student €3.10"
-                                            CustomerCategory.GRADUATE -> "Post-grad €6.35"
-                                            CustomerCategory.STAFF -> "Staff €7.30"
-                                            CustomerCategory.NORMAL -> "Normal €9.80"
-                                        },
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
                 // If user has multiple favorites, offer a clean, minimal switcher bar
                 if (favorites.size > 1) {
                     LazyRow(
@@ -548,11 +484,10 @@ fun HomeScreen(
                             selectedFilter = uiState.selectedFilter,
                             favoriteMealNames = uiState.favoriteMealNames,
                             eatenMealNames = uiState.eatenMeals.map { it.mealName }.toSet(),
-                            customerCategory = uiState.customerCategory,
                             dateFormatted = uiState.formattedDate,
                             onToggleFavoriteMeal = onToggleFavoriteMeal,
-                            onMealClick = { meal, rest -> onMealClick(meal, rest.name) },
-                            onOpenRestaurantDetail = { onSelectRestaurantForDetail(restaurant) }
+                            onOpenRestaurantDetail = onOpenRestaurantDetail,
+                            onMealClick = { meal, rest -> onMealClick(meal, rest.name) }
                         )
                     }
                 }

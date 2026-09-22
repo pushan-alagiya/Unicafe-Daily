@@ -82,11 +82,9 @@ fun MealItemView(
     isFavoriteMeal: Boolean = false,
     onToggleFavorite: (() -> Unit)? = null,
     isRecentlyEaten: Boolean = false,
-    customerCategory: fi.pushan.unicafedaily.domain.model.CustomerCategory = fi.pushan.unicafedaily.domain.model.CustomerCategory.STUDENT,
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
-    val displayPrice = meal.priceForCategory(customerCategory) ?: meal.studentPrice ?: "€3.10"
 
     Surface(
         onClick = { onMealClick(meal) },
@@ -96,7 +94,7 @@ fun MealItemView(
             .fillMaxWidth()
             .testTag("meal_item_${meal.id}")
             .semantics {
-                contentDescription = "${meal.category}: ${meal.name}. Price $displayPrice"
+                contentDescription = "${meal.category}: ${meal.name}."
             }
     ) {
         Column(
@@ -115,7 +113,7 @@ fun MealItemView(
 
                 // Name & Metadata
                 Column(modifier = Modifier.weight(1f)) {
-                    // Category & Price & Favorite Star
+                    // Category & Favorite Star (Rates/prices omitted as requested)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -159,22 +157,7 @@ fun MealItemView(
                             }
                         }
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                modifier = Modifier.padding(end = 4.dp)
-                            ) {
-                                Text(
-                                    text = displayPrice,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                )
-                            }
-
-                            if (onToggleFavorite != null) {
+                        if (onToggleFavorite != null) {
                                 val starScale by animateFloatAsState(
                                     targetValue = if (isFavoriteMeal) 1.2f else 1.0f,
                                     animationSpec = spring(
@@ -202,7 +185,6 @@ fun MealItemView(
                                 }
                             }
                         }
-                    }
 
                     Spacer(modifier = Modifier.height(3.dp))
 

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
@@ -38,9 +40,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.filled.Info
-import fi.pushan.unicafedaily.domain.model.CustomerCategory
 import fi.pushan.unicafedaily.domain.model.DietaryFilter
 import fi.pushan.unicafedaily.domain.model.Meal
 import fi.pushan.unicafedaily.domain.model.Restaurant
@@ -52,9 +51,8 @@ fun RestaurantCard(
     favoriteMealNames: Set<String> = emptySet(),
     eatenMealNames: Set<String> = emptySet(),
     dateFormatted: String = "",
-    customerCategory: CustomerCategory = CustomerCategory.STUDENT,
-    onOpenRestaurantDetail: ((Restaurant) -> Unit)? = null,
     onToggleFavoriteMeal: ((String) -> Unit)? = null,
+    onOpenRestaurantDetail: ((Restaurant) -> Unit)? = null,
     onMealClick: (Meal, Restaurant) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -82,7 +80,7 @@ fun RestaurantCard(
                 .fillMaxWidth()
                 .padding(14.dp)
         ) {
-            // Header Row: Restaurant Name + Status Badge & Share + Info
+            // Header Row: Restaurant Name + Status Badge & Share
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -91,11 +89,10 @@ fun RestaurantCard(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .then(
-                            if (onOpenRestaurantDetail != null) {
-                                Modifier.clickable { onOpenRestaurantDetail(restaurant) }
-                            } else Modifier
-                        )
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(enabled = onOpenRestaurantDetail != null) {
+                            onOpenRestaurantDetail?.invoke(restaurant)
+                        }
                 ) {
                     Text(
                         text = restaurant.name,
@@ -250,8 +247,7 @@ fun RestaurantCard(
                         onToggleFavorite = if (onToggleFavoriteMeal != null) {
                             { onToggleFavoriteMeal(meal.name) }
                         } else null,
-                        isRecentlyEaten = isEaten,
-                        customerCategory = customerCategory
+                        isRecentlyEaten = isEaten
                     )
                 }
             }
