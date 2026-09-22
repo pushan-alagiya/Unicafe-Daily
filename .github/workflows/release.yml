@@ -43,6 +43,7 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+	  chmod +x ./gradlew	
           ./gradlew clean assembleRelease
 
       - name: Verify APK signature
