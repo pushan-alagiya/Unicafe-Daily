@@ -1,6 +1,7 @@
 package fi.pushan.unicafedaily.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -25,16 +27,17 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -56,17 +60,26 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fi.pushan.unicafedaily.domain.model.CustomerCategory
 import fi.pushan.unicafedaily.domain.model.EatenMealRecord
 import fi.pushan.unicafedaily.ui.theme.BrandBlue
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+data class LunchRateOption(
+    val id: String,
+    val label: String,
+    val rateEur: Double,
+    val description: String
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BudgetHistorySheet(
     eatenMeals: List<EatenMealRecord>,
     monthlyBudgetEur: Double? = null,
+    customerCategory: CustomerCategory = CustomerCategory.STUDENT,
     onSaveMonthlyBudget: (Double?) -> Unit = {},
     onDeleteRecord: (String) -> Unit,
     onDismiss: () -> Unit,
@@ -77,9 +90,32 @@ fun BudgetHistorySheet(
 
     val totalSpent = eatenMeals.sumOf { it.priceEur }
     val lunchCount = eatenMeals.size
-    val avgPrice = if (lunchCount > 0) totalSpent / lunchCount else 3.10
+    val historyAvg = if (lunchCount > 0) totalSpent / lunchCount else 3.10
 
-    var isEditingBudget by remember { mutableStateOf(false) }
+    val rateOptions = remember(historyAvg, lunchCount) {
+        listOf(
+            LunchRateOption("STUDENT", "Student 3.10€", 3.10, "Kela student price"),
+            LunchRateOption("GRADUATE", "Postgrad 6.00€", 6.00, "Post-graduate price"),
+            LunchRateOption("STAFF", "Staff 7.60€", 7.60, "Staff & pensioner price"),
+            LunchRateOption("NORMAL", "Normal 9.60€", 9.60, "Visitor price"),
+            LunchRateOption("HISTORY", "Avg ${String.format(Locale.ROOT, "%.2f€", historyAvg)}", historyAvg, "Actual history avg")
+        )
+    }
+
+    var selectedRateId by remember(customerCategory) {
+        mutableStateOf(
+            when (customerCategory) {
+                CustomerCategory.STUDENT -> "STUDENT"
+                CustomerCategory.GRADUATE -> "GRADUATE"
+                CustomerCategory.STAFF -> "STAFF"
+                CustomerCategory.NORMAL -> "NORMAL"
+            }
+        )
+    }
+
+    val activeRateOption = rateOptions.firstOrNull { it.id == selectedRateId } ?: rateOptions.first()
+    val activeRatePerMeal = activeRateOption.rateEur
+
     var budgetInput by remember(monthlyBudgetEur) {
         mutableStateOf(monthlyBudgetEur?.let { String.format(Locale.ROOT, "%.2f", it) } ?: "")
     }
@@ -206,7 +242,7 @@ fun BudgetHistorySheet(
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "AVG / MEAL",
+                            text = "RATE / MEAL",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
@@ -214,7 +250,7 @@ fun BudgetHistorySheet(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = String.format(Locale.ROOT, "€%.2f", avgPrice),
+                            text = String.format(Locale.ROOT, "€%.2f", activeRatePerMeal),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -223,9 +259,52 @@ fun BudgetHistorySheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Monthly Budget Card
+            // Rate Category Selector: choose between Student 3.10€, Staff, etc.
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "CALCULATE WITH RATE:",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 0.5.sp,
+                    fontSize = 10.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(rateOptions, key = { it.id }) { option ->
+                        val isSelected = option.id == selectedRateId
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) BrandBlue else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isSelected) BrandBlue else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { selectedRateId = option.id }
+                                .testTag("rate_option_${option.id}")
+                        ) {
+                            Text(
+                                text = option.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Monthly Budget Card with Sleek, Proper Input Field
             Surface(
                 shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -255,71 +334,31 @@ fun BudgetHistorySheet(
                             )
                         }
 
-                        if (!isEditingBudget) {
+                        if (monthlyBudgetEur != null && monthlyBudgetEur > 0) {
                             TextButton(
-                                onClick = { isEditingBudget = true },
-                                modifier = Modifier.height(28.dp)
+                                onClick = {
+                                    budgetInput = ""
+                                    onSaveMonthlyBudget(null)
+                                },
+                                modifier = Modifier.height(28.dp).testTag("clear_budget_btn")
                             ) {
                                 Text(
-                                    text = if (monthlyBudgetEur != null) "Edit" else "Set Budget",
+                                    text = "Reset",
                                     fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.error,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
                     }
 
-                    if (isEditingBudget) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = budgetInput,
-                                onValueChange = { budgetInput = it },
-                                placeholder = { Text("e.g. 70.00") },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Decimal,
-                                    imeAction = ImeAction.Done
-                                ),
-                                keyboardActions = KeyboardActions(onDone = {
-                                    focusManager.clearFocus()
-                                    val parsed = budgetInput.toDoubleOrNull()
-                                    onSaveMonthlyBudget(parsed)
-                                    isEditingBudget = false
-                                }),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                                    focusedBorderColor = BrandBlue
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f).height(50.dp)
-                            )
-
-                            Button(
-                                onClick = {
-                                    focusManager.clearFocus()
-                                    val parsed = budgetInput.toDoubleOrNull()
-                                    onSaveMonthlyBudget(parsed)
-                                    isEditingBudget = false
-                                },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = BrandBlue),
-                                modifier = Modifier.height(50.dp)
-                            ) {
-                                Icon(Icons.Default.Check, contentDescription = "Save", modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Save", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    } else if (monthlyBudgetEur != null && monthlyBudgetEur > 0) {
+                    if (monthlyBudgetEur != null && monthlyBudgetEur > 0) {
                         val remaining = (monthlyBudgetEur - totalSpent).coerceAtLeast(0.0)
                         val progress = (totalSpent / monthlyBudgetEur).toFloat().coerceIn(0f, 1f)
+                        val projectedLunchesRemaining = if (activeRatePerMeal > 0) (remaining / activeRatePerMeal).toInt() else 0
+                        val totalCoveredLunches = if (activeRatePerMeal > 0) (monthlyBudgetEur / activeRatePerMeal).toInt() else 0
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         LinearProgressIndicator(
                             progress = { progress },
@@ -327,36 +366,209 @@ fun BudgetHistorySheet(
                                 .fillMaxWidth()
                                 .height(8.dp)
                                 .clip(RoundedCornerShape(4.dp)),
-                            color = if (progress > 0.9f) MaterialTheme.colorScheme.error else BrandBlue,
+                            color = when {
+                                progress > 0.9f -> MaterialTheme.colorScheme.error
+                                progress > 0.75f -> Color(0xFFF59E0B)
+                                else -> BrandBlue
+                            },
                             trackColor = MaterialTheme.colorScheme.surfaceVariant,
                             strokeCap = StrokeCap.Round
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = String.format(Locale.ROOT, "€%.2f remaining", remaining),
+                                text = if (totalSpent > monthlyBudgetEur) {
+                                    String.format(Locale.ROOT, "Over by €%.2f", totalSpent - monthlyBudgetEur)
+                                } else {
+                                    String.format(Locale.ROOT, "€%.2f remaining", remaining)
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Bold,
-                                color = if (remaining <= 5.0) MaterialTheme.colorScheme.error else Color(0xFF059669)
+                                color = if (totalSpent > monthlyBudgetEur) MaterialTheme.colorScheme.error else Color(0xFF059669)
                             )
                             Text(
-                                text = String.format(Locale.ROOT, "Budget €%.2f", monthlyBudgetEur),
+                                text = String.format(Locale.ROOT, "€%.2f / €%.2f (%.0f%%)", totalSpent, monthlyBudgetEur, progress * 100),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "≈ $projectedLunchesRemaining lunches left at €${String.format(Locale.ROOT, "%.2f", activeRatePerMeal)}/meal",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = BrandBlue
+                                )
+                                Text(
+                                    text = "Covers ~$totalCoveredLunches/mo",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
                     } else {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Set an optional monthly budget to keep your student meal spending on track.",
+                            text = "Set a monthly budget to track your lunch spending & remaining meals.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+
+                    // Sleek, compact, proper input field container (44dp height)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Euro,
+                                    contentDescription = null,
+                                    tint = BrandBlue,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                BasicTextField(
+                                    value = budgetInput,
+                                    onValueChange = { budgetInput = it },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Decimal,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    keyboardActions = KeyboardActions(onDone = {
+                                        focusManager.clearFocus()
+                                        val parsed = budgetInput.toDoubleOrNull()
+                                        onSaveMonthlyBudget(parsed)
+                                    }),
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    cursorBrush = SolidColor(BrandBlue),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("budget_input_field"),
+                                    decorationBox = { innerTextField ->
+                                        if (budgetInput.isEmpty()) {
+                                            Text(
+                                                text = "Set budget (e.g. 70.00)",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                )
+                                if (budgetInput.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = { budgetInput = "" },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Clear",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                focusManager.clearFocus()
+                                val parsed = budgetInput.toDoubleOrNull()
+                                onSaveMonthlyBudget(parsed)
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandBlue),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                            modifier = Modifier
+                                .height(44.dp)
+                                .testTag("budget_save_btn")
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = "Save", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Save", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
+
+                    // Quick Preset Chips for easy selection
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Quick:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        listOf(50, 70, 90, 120).forEach { preset ->
+                            val isSelected = monthlyBudgetEur != null && Math.abs(monthlyBudgetEur - preset) < 0.01
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) BrandBlue else MaterialTheme.colorScheme.surface,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (isSelected) BrandBlue else MaterialTheme.colorScheme.outlineVariant
+                                ),
+                                modifier = Modifier
+                                    .clickable {
+                                        budgetInput = preset.toString()
+                                        onSaveMonthlyBudget(preset.toDouble())
+                                        focusManager.clearFocus()
+                                    }
+                                    .testTag("preset_budget_${preset}")
+                            ) {
+                                Text(
+                                    text = "€$preset",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }

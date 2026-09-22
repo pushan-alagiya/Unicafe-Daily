@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Restaurant
@@ -88,6 +89,7 @@ fun HomeScreen(
     onOpenLeavingForLunch: () -> Unit = {},
     onOpenSurpriseMe: () -> Unit = {},
     onOpenBudgetHistory: () -> Unit = {},
+    onOpenFavoriteDishes: () -> Unit = {},
     onToggleFavoriteMeal: (String) -> Unit = {},
     onOpenRestaurantDetail: (Restaurant) -> Unit = {},
     onOpenUniCafeInfo: () -> Unit = {},
@@ -186,6 +188,36 @@ fun HomeScreen(
                             contentDescription = stringResource(R.string.filter_button),
                             tint = if (uiState.selectedFilter != DietaryFilter.ALL || uiState.statusFilter != "ALL") BrandBlue else MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+
+                    // Favorite Dishes Screen
+                    IconButton(
+                        onClick = onOpenFavoriteDishes,
+                        modifier = Modifier.testTag("home_favorite_dishes_button")
+                    ) {
+                        Box(contentAlignment = Alignment.TopEnd) {
+                            Icon(
+                                imageVector = Icons.Default.Favorite,
+                                contentDescription = "Favorite dishes screen",
+                                tint = Color(0xFFEF4444)
+                            )
+                            if (uiState.favoriteMealNames.isNotEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(13.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFEF4444)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${uiState.favoriteMealNames.size}",
+                                        color = Color.White,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     // Manage Favorites Action

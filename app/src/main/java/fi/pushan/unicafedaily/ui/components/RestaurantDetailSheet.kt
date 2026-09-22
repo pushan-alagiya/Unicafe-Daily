@@ -1,5 +1,7 @@
 package fi.pushan.unicafedaily.ui.components
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Accessible
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
@@ -217,16 +220,23 @@ fun RestaurantDetailSheet(
                         icon = Icons.Default.NearMe,
                         label = "Directions",
                         testTag = "action_map_btn",
-                        onClick = { openMapIntent(context, restaurant.name, restaurant.address) }
+                        onClick = {
+                            copyToClipboard(context, "Address", restaurant.address, "Address copied: ${restaurant.address}")
+                            openMapIntent(context, restaurant.name, restaurant.address)
+                        }
                     )
                 }
 
                 if (!restaurant.phone.isNullOrBlank()) {
+                    val cleanPhone = extractPrimaryPhoneNumber(restaurant.phone)
                     CafeActionButton(
                         icon = Icons.Default.Call,
-                        label = "Call",
+                        label = "Phone",
                         testTag = "action_call_btn",
-                        onClick = { openPhoneIntent(context, restaurant.phone) }
+                        onClick = {
+                            copyToClipboard(context, "Phone Number", cleanPhone, "Phone copied: $cleanPhone")
+                            openPhoneIntent(context, cleanPhone)
+                        }
                     )
                 }
 
@@ -235,16 +245,23 @@ fun RestaurantDetailSheet(
                         icon = Icons.Default.Email,
                         label = "Email",
                         testTag = "action_email_btn",
-                        onClick = { openEmailIntent(context, restaurant.email) }
+                        onClick = {
+                            copyToClipboard(context, "Email", restaurant.email, "Email copied: ${restaurant.email}")
+                            openEmailIntent(context, restaurant.email)
+                        }
                     )
                 }
 
                 if (!restaurant.websiteUrl.isNullOrBlank()) {
+                    val webUrl = restaurant.websiteUrl
                     CafeActionButton(
                         icon = Icons.Default.Language,
                         label = "Website",
                         testTag = "action_web_btn",
-                        onClick = { openWebIntent(context, restaurant.websiteUrl) }
+                        onClick = {
+                            copyToClipboard(context, "Website", webUrl, "Website link copied to clipboard")
+                            openWebIntent(context, webUrl)
+                        }
                     )
                 }
 
@@ -454,28 +471,227 @@ fun RestaurantDetailSheet(
                 }
             }
 
-            // Campus Info Note
+            // Contact & Location Details Card with direct Copy actions
             Spacer(modifier = Modifier.height(16.dp))
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = "LOCATION & CONTACT",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 0.6.sp
+                    )
+
+                    if (restaurant.address.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = restaurant.address,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    copyToClipboard(context, "Address", restaurant.address, "Address copied to clipboard")
+                                },
+                                modifier = Modifier.size(32.dp).testTag("copy_address_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy address",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (!restaurant.phone.isNullOrBlank()) {
+                        val cleanPhone = extractPrimaryPhoneNumber(restaurant.phone)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Call,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = cleanPhone,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    copyToClipboard(context, "Phone Number", cleanPhone, "Phone number copied to clipboard")
+                                },
+                                modifier = Modifier.size(32.dp).testTag("copy_phone_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy phone",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (!restaurant.email.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Email,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = restaurant.email,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    copyToClipboard(context, "Email", restaurant.email, "Email copied to clipboard")
+                                },
+                                modifier = Modifier.size(32.dp).testTag("copy_email_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy email",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (!restaurant.websiteUrl.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Language,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = restaurant.websiteUrl,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    copyToClipboard(context, "Website", restaurant.websiteUrl, "Website copied to clipboard")
+                                },
+                                modifier = Modifier.size(32.dp).testTag("copy_website_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy website",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Campus & Accessibility Info Note
+            Spacer(modifier = Modifier.height(14.dp))
             Card(
                 shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.Top) {
                         Icon(
                             imageVector = Icons.Default.Accessible,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(18.dp).padding(top = 2.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "UniCafe ${restaurant.name} serves ${restaurant.campus} campus with accessible entrance and student-subsidized lunch service.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            lineHeight = 20.sp
-                        )
+                        Column {
+                            val desc = restaurant.description?.trim()
+                            if (!desc.isNullOrBlank()) {
+                                Text(
+                                    text = "Accessibility & Info",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = desc,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 18.sp
+                                )
+                            } else {
+                                Text(
+                                    text = "UniCafe ${restaurant.name} serves ${restaurant.campus} campus with accessible entrance and student-subsidized lunch service.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    lineHeight = 20.sp
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -591,17 +807,35 @@ private fun openMapIntent(context: Context, name: String, address: String) {
             val webUri = Uri.parse("https://www.google.com/maps/search/?api=1&query=" + Uri.encode("UniCafe $name, $address"))
             context.startActivity(Intent(Intent.ACTION_VIEW, webUri))
         } catch (_: Exception) {
-            Toast.makeText(context, "Could not open map", Toast.LENGTH_SHORT).show()
+            // Already copied to clipboard, fallback message
         }
     }
 }
 
+private fun copyToClipboard(context: Context, label: String, text: String, toastMessage: String) {
+    try {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText(label, text)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
+    } catch (_: Exception) {
+        Toast.makeText(context, "Could not copy to clipboard", Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun extractPrimaryPhoneNumber(phoneText: String): String {
+    val firstLine = phoneText.lineSequence().map { it.trim() }.firstOrNull { it.isNotBlank() } ?: phoneText.trim()
+    val phonePart = firstLine.split("(").firstOrNull()?.trim() ?: firstLine
+    return if (phonePart.isNotBlank()) phonePart else firstLine
+}
+
 private fun openPhoneIntent(context: Context, phone: String) {
     try {
-        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${phone.replace(" ", "")}"))
+        val dialNumber = extractPrimaryPhoneNumber(phone).replace(" ", "")
+        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$dialNumber"))
         context.startActivity(intent)
     } catch (_: Exception) {
-        Toast.makeText(context, "Could not open phone dialer", Toast.LENGTH_SHORT).show()
+        // Already copied to clipboard
     }
 }
 
@@ -610,7 +844,7 @@ private fun openEmailIntent(context: Context, email: String) {
         val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$email"))
         context.startActivity(intent)
     } catch (_: Exception) {
-        Toast.makeText(context, "Could not open email app", Toast.LENGTH_SHORT).show()
+        // Already copied to clipboard
     }
 }
 
@@ -620,7 +854,7 @@ private fun openWebIntent(context: Context, url: String) {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(finalUrl))
         context.startActivity(intent)
     } catch (_: Exception) {
-        Toast.makeText(context, "Could not open browser", Toast.LENGTH_SHORT).show()
+        // Already copied to clipboard
     }
 }
 

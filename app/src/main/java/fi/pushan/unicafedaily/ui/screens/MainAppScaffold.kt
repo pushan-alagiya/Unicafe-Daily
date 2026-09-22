@@ -124,6 +124,7 @@ fun MainAppScaffold(
                         onOpenLeavingForLunch = viewModel::onOpenLeavingForLunch,
                         onOpenSurpriseMe = viewModel::onOpenSurpriseMe,
                         onOpenBudgetHistory = viewModel::onOpenBudgetHistory,
+                        onOpenFavoriteDishes = viewModel::onOpenFavoriteDishes,
                         onToggleFavoriteMeal = viewModel::onToggleFavoriteMeal,
                         onMealClick = { meal, restName ->
                             viewModel.onViewMeal(meal, restName)
@@ -210,6 +211,7 @@ fun MainAppScaffold(
         BudgetHistorySheet(
             eatenMeals = uiState.eatenMeals,
             monthlyBudgetEur = uiState.monthlyBudgetEur,
+            customerCategory = uiState.selectedCustomerCategory,
             onSaveMonthlyBudget = viewModel::onSaveMonthlyBudget,
             onDeleteRecord = viewModel::onDeleteEatenMeal,
             onDismiss = viewModel::onDismissBudgetHistory

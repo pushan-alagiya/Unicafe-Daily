@@ -3,6 +3,7 @@ package fi.pushan.unicafedaily.ui.components
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.HorizontalDivider
@@ -80,6 +82,7 @@ fun MealItemView(
     onMealClick: (Meal) -> Unit,
     showDivider: Boolean = true,
     isFavoriteMeal: Boolean = false,
+    isRepeatedFavorite: Boolean = false,
     onToggleFavorite: (() -> Unit)? = null,
     isRecentlyEaten: Boolean = false,
     modifier: Modifier = Modifier
@@ -88,8 +91,13 @@ fun MealItemView(
 
     Surface(
         onClick = { onMealClick(meal) },
-        shape = RoundedCornerShape(14.dp),
-        color = Color.Transparent,
+        shape = RoundedCornerShape(12.dp),
+        color = if (isFavoriteMeal) {
+            if (isDark) Color(0xFF451A03).copy(alpha = 0.35f) else Color(0xFFFFFBEB)
+        } else Color.Transparent,
+        border = if (isFavoriteMeal) {
+            BorderStroke(1.dp, if (isRepeatedFavorite) Color(0xFFF59E0B) else Color(0xFFF59E0B).copy(alpha = 0.45f))
+        } else null,
         modifier = modifier
             .fillMaxWidth()
             .testTag("meal_item_${meal.id}")
@@ -100,7 +108,7 @@ fun MealItemView(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 10.dp, horizontal = 2.dp)
+                .padding(vertical = 8.dp, horizontal = if (isFavoriteMeal) 8.dp else 2.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -128,6 +136,35 @@ fun MealItemView(
                                 letterSpacing = 0.5.sp,
                                 fontSize = 11.sp
                             )
+
+                            if (isFavoriteMeal) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (isDark) Color(0xFF78350F) else Color(0xFFFEF3C7),
+                                    border = BorderStroke(0.5.dp, Color(0xFFF59E0B))
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isRepeatedFavorite) Icons.Default.Repeat else Icons.Default.Star,
+                                            contentDescription = null,
+                                            tint = if (isDark) Color(0xFFFCD34D) else Color(0xFFB45309),
+                                            modifier = Modifier.size(10.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text(
+                                            text = if (isRepeatedFavorite) "REPEATED FAV" else "FAVORITE",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDark) Color(0xFFFDE68A) else Color(0xFF92400E)
+                                        )
+                                    }
+                                }
+                            }
 
                             if (isRecentlyEaten) {
                                 Spacer(modifier = Modifier.width(6.dp))

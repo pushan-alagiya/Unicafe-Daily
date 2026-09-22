@@ -1,8 +1,10 @@
 package fi.pushan.unicafedaily.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
@@ -62,18 +65,26 @@ fun FavoriteDishesSheet(
     modifier: Modifier = Modifier
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val isDark = isSystemInDarkTheme()
 
     // Build matching info: for each favorite meal name, check which restaurants serve it today
+    // and prioritize repeated dishes (served across multiple cafes) at the top with prominent highlighting!
     val favDishItems = favoriteMealNames.map { mealName ->
         val matchingMealsWithRest = allRestaurants.flatMap { rest ->
-            rest.todaysMeals.filter { it.name.equals(mealName, ignoreCase = true) }
+            rest.todaysMeals.filter { it.name.trim().equals(mealName.trim(), ignoreCase = true) }
                 .map { meal -> Pair(meal, rest) }
         }
         val firstMeal = matchingMealsWithRest.firstOrNull()?.first
         val restaurantsServingToday = matchingMealsWithRest.map { it.second }.distinctBy { it.id }
 
         Triple(mealName, firstMeal, restaurantsServingToday)
-    }
+    }.sortedWith(
+        compareByDescending<Triple<String, Meal?, List<Restaurant>>> { it.third.size > 1 }
+            .thenByDescending { it.third.isNotEmpty() }
+            .thenBy { it.first }
+    )
+
+    val repeatedDishesCount = favDishItems.count { it.third.size > 1 }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -165,18 +176,55 @@ fun FavoriteDishesSheet(
                     )
                 }
             } else {
+                if (repeatedDishesCount > 0) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (isDark) Color(0xFF451A03).copy(alpha = 0.6f) else Color(0xFFFEF3C7),
+                        border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                            .padding(bottom = 10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Repeat,
+                                contentDescription = null,
+                                tint = if (isDark) Color(0xFFFCD34D) else Color(0xFFB45309),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "$repeatedDishesCount of your favorite dishes ${if (repeatedDishesCount == 1) "is" else "are"} repeated across campus today!",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) Color(0xFFFDE68A) else Color(0xFF92400E)
+                            )
+                        }
+                    }
+                }
+
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp)
                 ) {
                     items(favDishItems, key = { it.first }) { (mealName, sampleMeal, restaurantsServing) ->
+                        val isRepeated = restaurantsServing.size > 1
                         Card(
                             shape = RoundedCornerShape(14.dp),
+                            border = if (isRepeated) {
+                                BorderStroke(1.5.dp, Color(0xFFF59E0B))
+                            } else null,
                             colors = CardDefaults.cardColors(
-                                containerColor = if (restaurantsServing.isNotEmpty()) {
-                                    MaterialTheme.colorScheme.surfaceContainerLow
-                                } else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                containerColor = when {
+                                    isRepeated -> if (isDark) Color(0xFF451A03).copy(alpha = 0.5f) else Color(0xFFFFFBEB)
+                                    restaurantsServing.isNotEmpty() -> MaterialTheme.colorScheme.surfaceContainerLow
+                                    else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                }
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -243,28 +291,97 @@ fun FavoriteDishesSheet(
 
                                 Spacer(modifier = Modifier.height(10.dp))
 
-                                // Serving status today
+                                // Serving status today with highlighting for repeated dishes
                                 if (restaurantsServing.isNotEmpty()) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = Color(0xFFDCFCE7)
+                                    if (isRepeated) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(bottom = 6.dp)
                                         ) {
-                                            Text(
-                                                text = "SERVED TODAY",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFF166534),
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = if (isDark) Color(0xFF78350F) else Color(0xFFFEF3C7),
+                                                border = BorderStroke(1.dp, Color(0xFFF59E0B))
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Repeat,
+                                                        contentDescription = null,
+                                                        tint = if (isDark) Color(0xFFFCD34D) else Color(0xFFB45309),
+                                                        modifier = Modifier.size(13.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = "REPEATED IN ${restaurantsServing.size} CAFES TODAY",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = if (isDark) Color(0xFFFDE68A) else Color(0xFF92400E),
+                                                        fontSize = 10.sp
+                                                    )
+                                                }
+                                            }
                                         }
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "at ${restaurantsServing.joinToString { it.name }}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
+                                    } else {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(bottom = 6.dp)
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = Color(0xFFDCFCE7)
+                                            ) {
+                                                Text(
+                                                    text = "SERVED TODAY",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF166534),
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Interactive restaurant chips
+                                    FlowRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        restaurantsServing.forEach { rest ->
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = if (isRepeated) {
+                                                    if (isDark) Color(0xFF78350F).copy(alpha = 0.5f) else Color(0xFFFDE68A).copy(alpha = 0.6f)
+                                                } else MaterialTheme.colorScheme.surfaceVariant,
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .clickable {
+                                                        sampleMeal?.let { meal -> onMealClick(meal, rest) }
+                                                    }
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Restaurant,
+                                                        contentDescription = null,
+                                                        tint = BrandBlue,
+                                                        modifier = Modifier.size(12.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = rest.name,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 } else {
                                     Text(

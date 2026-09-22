@@ -236,8 +236,8 @@ fun RestaurantCard(
                 )
             } else {
                 filteredMeals.forEachIndexed { index, meal ->
-                    val isFav = favoriteMealNames.contains(meal.name)
-                    val isEaten = eatenMealNames.contains(meal.name)
+                    val isFav = favoriteMealNames.any { it.trim().equals(meal.name.trim(), ignoreCase = true) }
+                    val isEaten = eatenMealNames.any { it.trim().equals(meal.name.trim(), ignoreCase = true) }
 
                     MealItemView(
                         meal = meal,
